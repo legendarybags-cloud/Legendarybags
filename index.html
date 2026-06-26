@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#17324d" />
     <title>Lead Assistant</title>
-    <link rel="manifest" href="manifest.webmanifest?v=14" />
-    <link rel="stylesheet" href="styles.css?v=14" />
+    <link rel="manifest" href="manifest.webmanifest?v=15" />
+    <link rel="stylesheet" href="styles.css?v=15" />
   </head>
   <body>
     <header class="app-header">
@@ -22,7 +22,16 @@
     </header>
 
     <main class="app-shell">
-      <aside class="lead-entry panel">
+      <details class="lead-entry panel capture-panel" id="leadEntryPanel">
+        <summary class="capture-summary">
+          <span>
+            <span class="summary-kicker">Capture center</span>
+            <strong>Add or update a lead</strong>
+            <small>Paste, photo, upload, or type once.</small>
+          </span>
+          <span class="summary-action" aria-hidden="true"></span>
+        </summary>
+        <div class="capture-body">
         <div class="panel-header">
           <div>
             <h2 id="formTitle">Add lead</h2>
@@ -248,22 +257,36 @@
           <button class="primary-button full-width" id="saveLeadButton" type="submit">Save lead</button>
           <button class="secondary-button full-width" id="cancelEditButton" type="button" hidden>Cancel edit</button>
         </form>
-      </aside>
+        </div>
+      </details>
 
       <section class="workspace">
         <nav class="tabs" aria-label="Views">
-          <button class="tab-button active" data-view="dashboard" type="button">Dashboard</button>
-          <button class="tab-button" data-view="leads" type="button">Leads</button>
+          <button class="tab-button active" data-view="dashboard" type="button">Today</button>
+          <button class="tab-button" data-view="leads" type="button">Customers</button>
           <button class="tab-button" data-view="quote" type="button">Quote</button>
-          <button class="tab-button" data-view="marketing" type="button">Marketing</button>
-          <button class="tab-button" data-view="pricing" type="button">Pricing</button>
+          <button class="tab-button" data-view="marketing" type="button">Facebook</button>
+          <button class="tab-button" data-view="pricing" type="button">Prices</button>
           <button class="tab-button" data-view="templates" type="button">Templates</button>
           <button class="tab-button" data-view="settings" type="button">Settings</button>
         </nav>
 
         <section id="dashboardView" class="view active-view">
+          <div class="home-hero section-block">
+            <div>
+              <p class="summary-kicker">Work today</p>
+              <h2>Start with the next best action</h2>
+              <p>Capture new leads, follow up with due customers, quote packages, and build Facebook posts from one clean home screen.</p>
+            </div>
+            <div class="home-actions">
+              <button class="primary-button" id="openCaptureButton" type="button">New lead</button>
+              <button class="secondary-button" data-jump-view="leads" type="button">Find customer</button>
+              <button class="secondary-button" data-jump-view="quote" type="button">Quick quote</button>
+              <button class="secondary-button" data-jump-view="marketing" type="button">Facebook post</button>
+            </div>
+          </div>
           <div class="stats-grid" id="statsGrid"></div>
-          <div class="section-block">
+          <div class="section-block priority-block">
             <div class="section-heading">
               <div>
                 <h2>Today queue</h2>
@@ -272,7 +295,7 @@
             </div>
             <div class="lead-list compact" id="todayQueueList"></div>
           </div>
-          <div class="section-block">
+          <div class="section-block side-block">
             <div class="section-heading">
               <div>
                 <h2>Due follow-ups</h2>
@@ -282,7 +305,7 @@
             </div>
             <div class="lead-list compact" id="dueLeadList"></div>
           </div>
-          <div class="section-block">
+          <div class="section-block side-block">
             <div class="section-heading">
               <div>
                 <h2>Appointments</h2>
@@ -291,7 +314,7 @@
             </div>
             <div class="lead-list compact" id="appointmentLeadList"></div>
           </div>
-          <div class="section-block">
+          <div class="section-block side-block">
             <div class="section-heading">
               <div>
                 <h2>Hot leads</h2>
@@ -300,7 +323,7 @@
             </div>
             <div class="lead-list compact" id="hotLeadList"></div>
           </div>
-          <div class="section-block">
+          <div class="section-block insight-block">
             <div class="section-heading">
               <div>
                 <h2>Daily closeout</h2>
@@ -309,7 +332,7 @@
             </div>
             <div id="dailyCloseout"></div>
           </div>
-          <div class="section-block">
+          <div class="section-block insight-block">
             <div class="section-heading">
               <div>
                 <h2>Productivity</h2>
@@ -592,7 +615,7 @@
     </main>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="vendor/tesseract.min.js?v=14"></script>
-    <script src="app.js?v=14"></script>
+    <script src="vendor/tesseract.min.js?v=15"></script>
+    <script src="app.js?v=15"></script>
   </body>
 </html>

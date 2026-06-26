@@ -215,6 +215,7 @@
   let deferredInstallPrompt = null;
 
   const el = {
+    leadEntryPanel: document.getElementById("leadEntryPanel"),
     leadForm: document.getElementById("leadForm"),
     formTitle: document.getElementById("formTitle"),
     formSubtitle: document.getElementById("formSubtitle"),
@@ -294,6 +295,7 @@
     enableAlertsButton: document.getElementById("enableAlertsButton"),
     installButton: document.getElementById("installButton"),
     markDailyReviewButton: document.getElementById("markDailyReviewButton"),
+    openCaptureButton: document.getElementById("openCaptureButton"),
     toast: document.getElementById("toast")
   };
 
@@ -346,9 +348,16 @@
     document.querySelectorAll(".tab-button").forEach((button) => {
       button.addEventListener("click", () => switchView(button.dataset.view));
     });
+    document.querySelectorAll("[data-jump-view]").forEach((button) => {
+      button.addEventListener("click", () => switchView(button.dataset.jumpView));
+    });
 
     el.leadForm.addEventListener("submit", saveLeadFromForm);
-    el.cancelEditButton.addEventListener("click", resetLeadForm);
+    el.cancelEditButton.addEventListener("click", () => {
+      resetLeadForm();
+      closeCapturePanel();
+    });
+    el.openCaptureButton.addEventListener("click", () => openCapturePanel("name"));
     el.leadPhotoInput.addEventListener("change", handlePhotoSelected);
     el.leadFileInput.addEventListener("change", handleFileSelected);
     el.useOcrTextButton.addEventListener("click", fillLeadFromOcrText);
@@ -429,6 +438,22 @@
     document.querySelectorAll(".view").forEach((view) => {
       view.classList.toggle("active-view", view.id === `${viewName}View`);
     });
+  }
+
+  function openCapturePanel(focusTarget) {
+    if (el.leadEntryPanel) el.leadEntryPanel.open = true;
+    const target = {
+      name: document.getElementById("leadName"),
+      paste: el.quickPaste
+    }[focusTarget];
+    window.setTimeout(() => {
+      el.leadEntryPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+      target?.focus();
+    }, 50);
+  }
+
+  function closeCapturePanel() {
+    if (el.leadEntryPanel && !el.editingLeadId.value) el.leadEntryPanel.open = false;
   }
 
   function populateQuoteSelects() {
@@ -1264,6 +1289,7 @@
       state.leads = state.leads.map((item) => (item.id === existingLead.id ? lead : item));
       saveState();
       resetLeadForm();
+      closeCapturePanel();
       renderAll();
       switchView("leads");
       toast("Lead updated.");
@@ -1273,6 +1299,7 @@
     state.leads.unshift(lead);
     saveState();
     resetLeadForm();
+    closeCapturePanel();
     renderAll();
     switchView("leads");
     toast("Lead saved.");
@@ -1336,6 +1363,7 @@
     el.formSubtitle.textContent = lead.name ? `Updating ${lead.name}` : "Updating saved lead";
     el.saveLeadButton.textContent = "Update lead";
     el.cancelEditButton.hidden = false;
+    openCapturePanel("name");
 
     setFieldValue("leadName", lead.name);
     setFieldValue("leadSource", lead.source);
@@ -2100,6 +2128,7 @@
     el.leadTabletCount.value = String(quote.tabletCount);
     renderQuoteSummaries();
     switchView("dashboard");
+    openCapturePanel("name");
     toast("Quote copied to lead form.");
   }
 

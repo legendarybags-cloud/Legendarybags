@@ -13,6 +13,7 @@ A local-first lead tracker for phone and internet sales follow-up.
 - Tracks status, priority, next step, appointments, appointment status, contact log, due follow-ups, pricing, CSV export, and JSON backup.
 - Creates appointment reminder text/email drafts and downloadable calendar events.
 - Shows a Today Queue, daily closeout numbers, productivity stats, hot leads, due follow-ups, and upcoming appointments.
+- Opens to a cleaner Today command center with the lead capture form folded until you need it.
 - Uses collapsible mobile sections so customer info, quote, workflow, follow-up, and notes do not all compete on one screen.
 - Keeps lead cards compact by showing the main contact buttons first and putting extra actions, notes, and activity behind expanders.
 - Warns about possible duplicates by matching phone or email.
