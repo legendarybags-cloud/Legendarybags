@@ -20,7 +20,7 @@ A local-first lead tracker for phone and internet sales follow-up.
 - Uses collapsible mobile sections so customer info, quote, workflow, follow-up, and notes do not all compete on one screen.
 - Keeps lead cards compact by showing the main contact buttons first and putting extra actions, notes, and activity behind expanders.
 - Warns about possible duplicates by matching phone or email.
-- Adds a Facebook Marketing tab for Zirrus-aligned campaign drafts, official Zirrus promo refresh, monthly promo rewrites, local group/manual posting plans, a posting queue, response tracking, lead counters, and Meta Business Suite shortcuts.
+- Adds a Facebook Marketing tab for Zirrus-aligned campaign drafts, official Zirrus promo refresh, monthly promo rewrites, simple copy-and-open posting, local group/manual posting plans, a posting queue, response tracking, lead counters, and Meta Business Suite shortcuts.
 - Saves data automatically in the browser, mirrors it to a second on-phone storage area, and shows last-saved/backup status on the Today screen.
 - Keeps data local unless you export it or add a secure sync backend later.
 
@@ -57,7 +57,9 @@ The Marketing tab generates three local post drafts from Zirrus-style campaign p
 
 Cloudflare Pages serves `/api/promos`, which reads public Zirrus pages and returns normalized promo suggestions. Facebook and Instagram can block automated reads; social-only promo automation needs Meta's official Pages/Instagram APIs and approved account access, so manual paste remains the fallback until that connection exists.
 
-The Facebook Page connection uses Cloudflare Functions under `/api/meta/*`. Add these Cloudflare Pages environment variables before connecting a Page: `META_APP_ID`, `META_APP_SECRET`, and `META_COOKIE_SECRET`. Optional: `META_GRAPH_VERSION` and `META_REDIRECT_URI`. In the Meta app, add this OAuth redirect URI: `https://legendarybags.pages.dev/api/meta/callback`. The frontend never stores the Page access token; it is encrypted in an HttpOnly cookie by Cloudflare.
+Simple Facebook posting does not need a Meta developer app. Generate a draft, tap Copy + open Facebook, paste it into the Business Suite or Page composer, then mark the queued post as posted and track responses/leads.
+
+Advanced direct Page posting uses Cloudflare Functions under `/api/meta/*`. Add these Cloudflare Pages environment variables before connecting a Page: `META_APP_ID`, `META_APP_SECRET`, and `META_COOKIE_SECRET`. Optional: `META_GRAPH_VERSION` and `META_REDIRECT_URI`. In the Meta app, add this OAuth redirect URI: `https://legendarybags.pages.dev/api/meta/callback`. The frontend never stores the Page access token; it is encrypted in an HttpOnly cookie by Cloudflare.
 
 Save the best draft to the posting queue, copy it into your Facebook Business Page or approved local groups, then mark it posted and track responses/leads.
 

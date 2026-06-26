@@ -937,13 +937,18 @@
       ? "Checking Facebook Page connection..."
       : connected
         ? `Connected to ${pageName}. You can post the selected draft to your Page.`
-        : metaConnection.message || (configured ? "Ready to connect your Facebook Page." : "Meta app is not configured in Cloudflare yet.");
+        : configured
+          ? "Simple mode is ready. Advanced direct posting is available if you connect your Page."
+          : "Simple mode is ready: copy the selected draft and open Facebook. Advanced direct posting can be set up later.";
     el.metaConnectionStatus.textContent = status;
-    el.metaConnectionPill.textContent = connected ? "Connected" : configured ? "Ready" : "Setup needed";
-    el.metaConnectionPill.className = `pill ${connected ? "closed" : configured ? "" : "warning"}`;
+    el.metaConnectionPill.textContent = connected ? "Connected" : "Simple mode";
+    el.metaConnectionPill.className = `pill ${connected ? "closed" : ""}`;
     if (el.connectMetaButton) el.connectMetaButton.disabled = !configured || connected || metaConnection.loading;
     if (el.refreshMetaStatusButton) el.refreshMetaStatusButton.disabled = metaConnection.loading;
-    if (el.postSelectedToMetaButton) el.postSelectedToMetaButton.disabled = !connected || metaConnection.loading;
+    if (el.postSelectedToMetaButton) {
+      el.postSelectedToMetaButton.disabled = metaConnection.loading;
+      el.postSelectedToMetaButton.textContent = connected ? "Post selected to Page" : "Copy + open Facebook";
+    }
     if (el.disconnectMetaButton) el.disconnectMetaButton.disabled = !connected || metaConnection.loading;
   }
 
@@ -1190,7 +1195,7 @@
       };
       renderMetaConnection();
       if (!quiet && metaConnection.connected) toast("Facebook Page connection checked.");
-      if (!quiet && !metaConnection.connected) toast(metaConnection.configured ? "Connect your Facebook Page." : "Add Meta settings in Cloudflare first.");
+      if (!quiet && !metaConnection.connected) toast("Simple mode is ready. Generate a draft, then copy and open Facebook.");
     } catch (error) {
       metaConnection = {
         configured: false,
@@ -1208,6 +1213,10 @@
     const draft = selectedMarketingDraft();
     if (!draft) {
       toast("Generate a draft first.");
+      return;
+    }
+    if (!metaConnection.connected) {
+      await copySelectedDraftAndOpenFacebook(draft);
       return;
     }
     const pageName = metaConnection.pageName || "your Facebook Page";
@@ -1229,6 +1238,25 @@
       el.postSelectedToMetaButton.textContent = "Post selected to Page";
       renderMetaConnection();
     }
+  }
+
+  async function copySelectedDraftAndOpenFacebook(draft) {
+    const text = draft?.text || "";
+    if (!text) {
+      toast("Generate a draft first.");
+      return;
+    }
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        toast("Copied. Opening Facebook.");
+      } else {
+        copyText(text);
+      }
+    } catch (error) {
+      copyText(text);
+    }
+    window.setTimeout(openBusinessSuite, 250);
   }
 
   async function disconnectMetaPage() {
