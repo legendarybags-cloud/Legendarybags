@@ -1,0 +1,17 @@
+{
+  "name": "Lead Assistant",
+  "short_name": "Leads",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "scope": "./",
+  "background_color": "#f4f7fa",
+  "theme_color": "#17324d",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#17324d" />
+    <title>Lead Assistant</title>
+    <link rel="manifest" href="manifest.webmanifest?v=14" />
+    <link rel="stylesheet" href="styles.css?v=14" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Zirrus sales helper</p>
+        <h1>Lead Assistant</h1>
+      </div>
+      <div class="header-actions">
+        <button class="ghost-button" id="enableAlertsButton" type="button">Alerts</button>
+        <button class="ghost-button" id="installButton" type="button" hidden>Install</button>
+        <button class="primary-button" id="exportJsonButton" type="button">Backup</button>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <aside class="lead-entry panel">
+        <div class="panel-header">
+          <div>
+            <h2 id="formTitle">Add lead</h2>
+            <p id="formSubtitle">Paste copied lead text or enter details once.</p>
+          </div>
+        </div>
+
+        <label for="quickPaste">Quick paste</label>
+        <div class="ocr-panel">
+          <div class="file-actions">
+            <label class="file-button" for="leadPhotoInput">Take photo</label>
+            <label class="file-button" for="leadFileInput">Upload file</label>
+          </div>
+          <input id="leadPhotoInput" type="file" accept="image/*" capture="environment" hidden />
+          <input id="leadFileInput" type="file" accept="image/*,.txt,.csv,.md" hidden />
+          <img id="ocrPreview" class="ocr-preview" alt="" hidden />
+          <div class="ocr-status" id="ocrStatus">Photo OCR ready</div>
+          <textarea id="ocrText" rows="4" placeholder="OCR text will appear here before filling fields."></textarea>
+          <button class="secondary-button full-width" id="useOcrTextButton" type="button">Fill from OCR text</button>
+        </div>
+        <textarea id="quickPaste" rows="5" placeholder="Paste copied lead details here. The app will look for name, phone, email, and notes."></textarea>
+        <div class="button-row">
+          <button class="secondary-button" id="readClipboardButton" type="button">Paste clipboard</button>
+          <button class="secondary-button" id="parsePasteButton" type="button">Fill fields</button>
+        </div>
+
+        <form id="leadForm" autocomplete="off">
+          <input id="editingLeadId" name="editingLeadId" type="hidden" />
+          <details class="form-section" open>
+            <summary>
+              <span>Customer</span>
+              <small>Name, phone, email, address</small>
+            </summary>
+            <div class="section-fields">
+              <div class="two-col">
+                <div>
+                  <label for="leadName">Name</label>
+                  <input id="leadName" name="name" required placeholder="Customer name" />
+                </div>
+                <div>
+                  <label for="leadSource">Source</label>
+                  <input id="leadSource" name="source" placeholder="monday, referral, walk-in" />
+                </div>
+              </div>
+
+              <div class="two-col">
+                <div>
+                  <label for="leadPhone">Phone</label>
+                  <input id="leadPhone" name="phone" inputmode="tel" placeholder="555-555-5555" />
+                </div>
+                <div>
+                  <label for="leadEmail">Email</label>
+                  <input id="leadEmail" name="email" inputmode="email" placeholder="name@example.com" />
+                </div>
+              </div>
+
+              <label for="leadAddress">Address</label>
+              <input id="leadAddress" name="address" placeholder="Service address or area" />
+
+              <div class="two-col">
+                <div>
+                  <label for="leadBestTime">Best time</label>
+                  <input id="leadBestTime" name="bestTime" placeholder="After 5, lunch, ASAP" />
+                </div>
+                <div>
+                  <label for="leadInterest">Main interest</label>
+                  <select id="leadInterest" name="interest">
+                    <option value="">Not sure yet</option>
+                    <option value="mobile">Mobile</option>
+                    <option value="internet">Internet</option>
+                    <option value="bundle">Mobile + Internet</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <details class="form-section">
+            <summary>
+              <span>Quote</span>
+              <small>Plan, speed, lines, budget</small>
+            </summary>
+            <div class="section-fields">
+              <div class="two-col">
+                <div>
+                  <label for="leadBudget">Budget</label>
+                  <input id="leadBudget" name="budget" placeholder="$50/month" />
+                </div>
+                <div>
+                  <label for="leadProvider">Current provider</label>
+                  <input id="leadProvider" name="currentProvider" placeholder="Carrier or ISP" />
+                </div>
+              </div>
+
+              <fieldset class="quote-box">
+                <legend>Quote</legend>
+                <div class="two-col">
+                  <div>
+                    <label for="leadMobilePlan">Mobile plan</label>
+                    <select id="leadMobilePlan" name="mobilePlan" data-quote-input="lead"></select>
+                  </div>
+                  <div>
+                    <label for="leadMobileLines">Lines</label>
+                    <select id="leadMobileLines" name="mobileLines" data-quote-input="lead">
+                      <option value="1">1 line</option>
+                      <option value="2">2 lines</option>
+                      <option value="3">3 lines</option>
+                      <option value="4">4 lines</option>
+                      <option value="5">5 lines</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="two-col">
+                  <div>
+                    <label for="leadInternetSpeed">Internet</label>
+                    <select id="leadInternetSpeed" name="internetSpeed" data-quote-input="lead"></select>
+                  </div>
+                  <div>
+                    <label for="leadTabletCount">Tablet/iPad</label>
+                    <select id="leadTabletCount" name="tabletCount" data-quote-input="lead">
+                      <option value="0">None</option>
+                      <option value="1">1 tablet/iPad</option>
+                      <option value="2">2 tablet/iPads</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="quote-summary" id="leadQuoteSummary"></div>
+                <button class="secondary-button full-width" id="copyLeadQuoteButton" type="button">Copy quote</button>
+              </fieldset>
+            </div>
+          </details>
+
+          <details class="form-section">
+            <summary>
+              <span>Workflow</span>
+              <small>Priority, next step, consent</small>
+            </summary>
+            <div class="section-fields">
+              <div class="two-col">
+                <div>
+                  <label for="leadPriority">Priority</label>
+                  <select id="leadPriority" name="priority">
+                    <option value="normal">Normal</option>
+                    <option value="hot">Hot</option>
+                    <option value="warm">Warm</option>
+                    <option value="cold">Cold</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="leadNextStep">Next step</label>
+                  <select id="leadNextStep" name="nextStep">
+                    <option value="call">Call</option>
+                    <option value="text">Text</option>
+                    <option value="email">Email</option>
+                    <option value="check-availability">Check availability</option>
+                    <option value="appointment">Appointment</option>
+                    <option value="waiting">Waiting</option>
+                    <option value="close">Close</option>
+                  </select>
+                </div>
+              </div>
+
+              <fieldset class="consent-box">
+                <legend>Permission</legend>
+                <label class="check-row">
+                  <input id="smsConsent" name="smsConsent" type="checkbox" />
+                  Customer gave permission to text
+                </label>
+                <label class="check-row">
+                  <input id="emailConsent" name="emailConsent" type="checkbox" />
+                  Customer gave permission to email
+                </label>
+              </fieldset>
+            </div>
+          </details>
+
+          <details class="form-section">
+            <summary>
+              <span>Follow-up</span>
+              <small>Reminders and appointment</small>
+            </summary>
+            <div class="section-fields">
+              <label for="followUpAt">Next follow-up</label>
+              <input id="followUpAt" name="followUpAt" type="datetime-local" />
+              <div class="button-row preset-row">
+                <button class="secondary-button" data-form-follow="30m" type="button">30 min</button>
+                <button class="secondary-button" data-form-follow="2h" type="button">2 hr</button>
+                <button class="secondary-button" data-form-follow="tomorrow" type="button">Tomorrow</button>
+                <button class="secondary-button" data-form-follow="3d" type="button">3 days</button>
+                <button class="secondary-button" data-form-follow="7d" type="button">7 days</button>
+              </div>
+
+              <label for="appointmentAt">Appointment</label>
+              <input id="appointmentAt" name="appointmentAt" type="datetime-local" />
+              <label for="appointmentStatus">Appointment status</label>
+              <select id="appointmentStatus" name="appointmentStatus">
+                <option value="">No appointment</option>
+                <option value="set">Set</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="completed">Completed</option>
+                <option value="missed">Missed</option>
+                <option value="reschedule">Needs reschedule</option>
+              </select>
+              <div class="button-row preset-row">
+                <button class="secondary-button" data-form-appointment="today5" type="button">Today 5p</button>
+                <button class="secondary-button" data-form-appointment="tomorrow9" type="button">Tomorrow 9a</button>
+                <button class="secondary-button" data-form-appointment="tomorrow5" type="button">Tomorrow 5p</button>
+              </div>
+            </div>
+          </details>
+
+          <details class="form-section">
+            <summary>
+              <span>Notes</span>
+              <small>Extra details from monday</small>
+            </summary>
+            <div class="section-fields">
+              <label for="leadNotes">Notes</label>
+              <textarea id="leadNotes" name="notes" rows="4" placeholder="Need, plan, credit, best time, objections"></textarea>
+            </div>
+          </details>
+
+          <button class="primary-button full-width" id="saveLeadButton" type="submit">Save lead</button>
+          <button class="secondary-button full-width" id="cancelEditButton" type="button" hidden>Cancel edit</button>
+        </form>
+      </aside>
+
+      <section class="workspace">
+        <nav class="tabs" aria-label="Views">
+          <button class="tab-button active" data-view="dashboard" type="button">Dashboard</button>
+          <button class="tab-button" data-view="leads" type="button">Leads</button>
+          <button class="tab-button" data-view="quote" type="button">Quote</button>
+          <button class="tab-button" data-view="marketing" type="button">Marketing</button>
+          <button class="tab-button" data-view="pricing" type="button">Pricing</button>
+          <button class="tab-button" data-view="templates" type="button">Templates</button>
+          <button class="tab-button" data-view="settings" type="button">Settings</button>
+        </nav>
+
+        <section id="dashboardView" class="view active-view">
+          <div class="stats-grid" id="statsGrid"></div>
+          <div class="section-block">
+            <div class="section-heading">
+              <div>
+                <h2>Today queue</h2>
+                <p>Sorted by urgency so the next best lead is on top.</p>
+              </div>
+            </div>
+            <div class="lead-list compact" id="todayQueueList"></div>
+          </div>
+          <div class="section-block">
+            <div class="section-heading">
+              <div>
+                <h2>Due follow-ups</h2>
+                <p>Leads that need attention now or today.</p>
+              </div>
+              <button class="secondary-button" id="markDailyReviewButton" type="button">Daily review done</button>
+            </div>
+            <div class="lead-list compact" id="dueLeadList"></div>
+          </div>
+          <div class="section-block">
+            <div class="section-heading">
+              <div>
+                <h2>Appointments</h2>
+                <p>Upcoming appointments and reminder drafts.</p>
+              </div>
+            </div>
+            <div class="lead-list compact" id="appointmentLeadList"></div>
+          </div>
+          <div class="section-block">
+            <div class="section-heading">
+              <div>
+                <h2>Hot leads</h2>
+                <p>High-priority leads that should stay visible.</p>
+              </div>
+            </div>
+            <div class="lead-list compact" id="hotLeadList"></div>
+          </div>
+          <div class="section-block">
+            <div class="section-heading">
+              <div>
+                <h2>Daily closeout</h2>
+                <p>End-of-day cleanup and tomorrow prep.</p>
+              </div>
+            </div>
+            <div id="dailyCloseout"></div>
+          </div>
+          <div class="section-block">
+            <div class="section-heading">
+              <div>
+                <h2>Productivity</h2>
+                <p>Today and overall activity that helps you manage volume.</p>
+              </div>
+            </div>
+            <div id="productivityStats"></div>
+          </div>
+        </section>
+
+        <section id="leadsView" class="view">
+          <div class="toolbar">
+            <input id="searchInput" type="search" placeholder="Search name, phone, email, notes" />
+            <select id="statusFilter">
+              <option value="all">All statuses</option>
+              <option value="new">New</option>
+              <option value="contacted">Contacted</option>
+              <option value="follow-up">Follow-up</option>
+              <option value="won">Won</option>
+              <option value="lost">Lost</option>
+            </select>
+            <button class="secondary-button" id="exportCsvButton" type="button">CSV</button>
+          </div>
+          <div class="lead-list" id="leadList"></div>
+        </section>
+
+        <section id="quoteView" class="view">
+          <div class="section-block">
+            <div class="section-heading">
+              <div>
+                <h2>Quick quote</h2>
+                <p>Price mobile, internet, or the bundle discount before saving the lead.</p>
+              </div>
+            </div>
+            <div class="quote-grid">
+              <div>
+                <label for="quoteMobilePlan">Mobile plan</label>
+                <select id="quoteMobilePlan" data-quote-input="quick"></select>
+              </div>
+              <div>
+                <label for="quoteMobileLines">Lines</label>
+                <select id="quoteMobileLines" data-quote-input="quick">
+                  <option value="1">1 line</option>
+                  <option value="2">2 lines</option>
+                  <option value="3">3 lines</option>
+                  <option value="4">4 lines</option>
+                  <option value="5">5 lines</option>
+                </select>
+              </div>
+              <div>
+                <label for="quoteInternetSpeed">Internet</label>
+                <select id="quoteInternetSpeed" data-quote-input="quick"></select>
+              </div>
+              <div>
+                <label for="quoteTabletCount">Tablet/iPad</label>
+                <select id="quoteTabletCount" data-quote-input="quick">
+                  <option value="0">None</option>
+                  <option value="1">1 tablet/iPad</option>
+                  <option value="2">2 tablet/iPads</option>
+                </select>
+              </div>
+            </div>
+            <div class="quote-summary large" id="quickQuoteSummary"></div>
+            <div class="button-row">
+              <button class="primary-button" id="copyQuickQuoteButton" type="button">Copy quote</button>
+              <button class="secondary-button" id="applyQuickQuoteButton" type="button">Use on lead form</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="marketingView" class="view">
+          <div class="section-block">
+            <div class="section-heading">
+              <div>
+                <h2>Facebook marketing bot</h2>
+                <p>Build compliant Page posts from Zirrus offer presets, plan local outreach, and route leads to Nick.</p>
+              </div>
+              <button class="secondary-button" id="openBusinessSuiteButton" type="button">Business Suite</button>
+            </div>
+
+            <div class="marketing-stats" id="marketingStats"></div>
+            <div class="pricing-note">Campaign presets stay close to Zirrus public offers: address checks, fiber speed, Smart Wi-Fi 6, mobile AutoPay, iPhone trade-in promos, business service, and the eligible $20 bundle discount.</div>
+
+            <form id="marketingForm" class="marketing-form">
+              <div class="two-col">
+                <div>
+                  <label for="marketingObjective">Zirrus campaign</label>
+                  <select id="marketingObjective" name="objective">
+                    <option value="address-check">Check address availability</option>
+                    <option value="fiber-speed">Fiber internet speed</option>
+                    <option value="smart-wifi">Smart Wi-Fi 6</option>
+                    <option value="bundle">Internet + mobile bundle</option>
+                    <option value="mobile-autopay">Mobile AutoPay savings</option>
+                    <option value="iphone-trade">iPhone/trade-in offer</option>
+                    <option value="local-service">Local Zirrus service</option>
+                    <option value="business">Business internet/phone</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="marketingTone">Tone</label>
+                  <select id="marketingTone" name="tone">
+                    <option value="neighbor">Neighborly</option>
+                    <option value="direct">Direct offer</option>
+                    <option value="helpful">Helpful/explainer</option>
+                    <option value="urgent">Limited-time push</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="two-col">
+                <div>
+                  <label for="marketingAudience">Local area</label>
+                  <input id="marketingAudience" name="audience" placeholder="Yadkinville, East Bend, local neighborhoods" />
+                </div>
+                <div>
+                  <label for="marketingChannel">Post type</label>
+                  <select id="marketingChannel" name="channel">
+                    <option value="page">Business Page</option>
+                    <option value="group-manual">Local group/manual</option>
+                    <option value="story">Story/Reel caption</option>
+                    <option value="ad">Lead ad idea</option>
+                  </select>
+                </div>
+              </div>
+
+              <label for="marketingOffer">Offer or package to push</label>
+              <input id="marketingOffer" name="offer" placeholder="Leave blank to use the selected Zirrus campaign offer" />
+
+              <label for="marketingHook">Local hook</label>
+              <input id="marketingHook" name="hook" placeholder="Leave blank to use the selected campaign hook" />
+
+              <div class="two-col">
+                <div>
+                  <label for="marketingPostDate">Target post time</label>
+                  <input id="marketingPostDate" name="postDate" type="datetime-local" />
+                </div>
+                <div>
+                  <label for="marketingPageUrl">Business Page URL</label>
+                  <input id="marketingPageUrl" name="pageUrl" placeholder="https://www.facebook.com/yourpage" />
+                </div>
+              </div>
+
+              <div class="button-row">
+                <button class="primary-button" id="generateMarketingButton" type="button">Generate drafts</button>
+                <button class="secondary-button" id="saveMarketingPostButton" type="submit">Save to queue</button>
+                <button class="secondary-button" id="copyMarketingDraftButton" type="button">Copy selected</button>
+              </div>
+            </form>
+
+            <div class="generated-posts" id="generatedPosts"></div>
+          </div>
+
+          <div class="section-block">
+            <div class="section-heading">
+              <div>
+                <h2>Posting queue</h2>
+                <p>Tap Copy, paste into your Page or approved group, then mark posted and track replies.</p>
+              </div>
+              <button class="secondary-button" id="openMetaPlannerButton" type="button">Planner</button>
+            </div>
+            <div class="marketing-queue" id="marketingQueue"></div>
+          </div>
+
+          <div class="section-block">
+            <div class="section-heading">
+              <div>
+                <h2>Local group tracker</h2>
+                <p>Keep group names, rules, and frequency limits handy before posting manually.</p>
+              </div>
+              <button class="secondary-button" id="saveMarketingGroupsButton" type="button">Save groups</button>
+            </div>
+            <textarea id="marketingGroupsText" rows="6" placeholder="Example: Yadkin County Community | promos allowed Fridays | no links in first comment"></textarea>
+          </div>
+
+          <div class="section-block">
+            <div class="section-heading">
+              <div>
+                <h2>Approved automation path</h2>
+                <p>Use this queue now. Add a backend later only after Meta Page permissions and app review are approved.</p>
+              </div>
+            </div>
+            <div class="compliance-grid">
+              <div class="mini-stat"><strong>Page API</strong><span>Can publish to your Page with approved permissions.</span></div>
+              <div class="mini-stat"><strong>Business Suite</strong><span>Best free scheduler for Page, Instagram, Stories, and Reels.</span></div>
+              <div class="mini-stat"><strong>Lead Ads</strong><span>Best path for local customer forms and real lead capture.</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="pricingView" class="view">
+          <div class="section-block">
+            <div class="section-heading">
+              <div>
+                <h2>Pricing</h2>
+                <p>Summer 2026 mobile and fiber pricing from your photos.</p>
+              </div>
+            </div>
+            <div id="pricingTables"></div>
+          </div>
+        </section>
+
+        <section id="templatesView" class="view">
+          <div class="section-block">
+            <div class="section-heading">
+              <div>
+                <h2>Message templates</h2>
+                <p>Use fields like {{firstName}}, {{quoteSummary}}, {{repName}}, {{businessName}}, {{replyPhone}}, and {{replyEmail}}.</p>
+              </div>
+              <button class="secondary-button" id="resetTemplatesButton" type="button">Reset</button>
+            </div>
+            <label for="smsInitialTemplate">Initial text</label>
+            <textarea id="smsInitialTemplate" rows="4"></textarea>
+            <label for="emailInitialTemplate">Initial email</label>
+            <textarea id="emailInitialTemplate" rows="7"></textarea>
+            <label for="smsFollowUpTemplate">Follow-up text</label>
+            <textarea id="smsFollowUpTemplate" rows="4"></textarea>
+            <label for="emailFollowUpTemplate">Follow-up email</label>
+            <textarea id="emailFollowUpTemplate" rows="7"></textarea>
+            <label for="smsAppointmentTemplate">Appointment reminder text</label>
+            <textarea id="smsAppointmentTemplate" rows="4"></textarea>
+            <label for="emailAppointmentTemplate">Appointment reminder email</label>
+            <textarea id="emailAppointmentTemplate" rows="7"></textarea>
+            <button class="primary-button" id="saveTemplatesButton" type="button">Save templates</button>
+          </div>
+        </section>
+
+        <section id="settingsView" class="view">
+          <div class="section-block">
+            <div class="section-heading">
+              <div>
+                <h2>Settings</h2>
+                <p>These values fill your templates and compliance footer.</p>
+              </div>
+            </div>
+            <form id="settingsForm">
+              <div class="two-col">
+                <div>
+                  <label for="repName">Your name</label>
+                  <input id="repName" name="repName" placeholder="Your name" />
+                </div>
+                <div>
+                  <label for="businessName">Business name</label>
+                  <input id="businessName" name="businessName" placeholder="Company or store" />
+                </div>
+              </div>
+              <div class="two-col">
+                <div>
+                  <label for="replyPhone">Reply phone</label>
+                  <input id="replyPhone" name="replyPhone" inputmode="tel" placeholder="Your work number" />
+                </div>
+                <div>
+                  <label for="replyEmail">Reply email</label>
+                  <input id="replyEmail" name="replyEmail" inputmode="email" placeholder="you@company.com" />
+                </div>
+              </div>
+              <label for="businessAddress">Business mailing address for email footer</label>
+              <textarea id="businessAddress" name="businessAddress" rows="3" placeholder="Store address or company mailing address"></textarea>
+              <button class="primary-button" type="submit">Save settings</button>
+            </form>
+          </div>
+
+          <div class="section-block">
+            <div class="section-heading">
+              <div>
+                <h2>Data</h2>
+                <p>Everything is saved in this browser. Export backups before clearing browser data.</p>
+              </div>
+            </div>
+            <div class="data-actions">
+              <button class="secondary-button" id="downloadBackupButton" type="button">Download backup</button>
+              <button class="secondary-button" id="shareBackupButton" type="button">Share backup</button>
+              <button class="secondary-button" id="copyBackupButton" type="button">Copy backup</button>
+              <label class="file-button" for="importBackupInput">Import backup</label>
+              <input id="importBackupInput" type="file" accept="application/json" hidden />
+              <button class="danger-button" id="clearClosedButton" type="button">Clear won/lost</button>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="vendor/tesseract.min.js?v=14"></script>
+    <script src="app.js?v=14"></script>
+  </body>
+</html>
