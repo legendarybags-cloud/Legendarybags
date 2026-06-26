@@ -86,6 +86,7 @@
     lastObjective: "address-check",
     monthlyPromo: "",
     monthlyPromoUpdatedAt: "",
+    monthlyPromoMonth: "",
     promoSuggestions: [],
     lastPromoFetchAt: "",
     promoFetchError: "",
@@ -862,6 +863,9 @@
     if (!el.marketingPromoStatus || !el.marketingPromoSuggestions) return;
     const suggestions = state.marketing.promoSuggestions || [];
     const status = [];
+    if (state.marketing.monthlyPromo) {
+      status.push(shouldRotateMonthlyPromo() ? "Saved promo is from an older month" : "Monthly promo is current");
+    }
     if (state.marketing.lastPromoFetchAt) status.push(`Last checked ${formatDateTime(state.marketing.lastPromoFetchAt)}`);
     if (state.marketing.promoFetchError) status.push(state.marketing.promoFetchError);
     if (!status.length) status.push("Use refresh to check public Zirrus promo pages.");
@@ -997,6 +1001,7 @@
     state.marketing.lastObjective = brief.objective;
     state.marketing.monthlyPromo = brief.monthlyPromo;
     state.marketing.monthlyPromoUpdatedAt = brief.monthlyPromo ? new Date().toISOString() : state.marketing.monthlyPromoUpdatedAt || "";
+    state.marketing.monthlyPromoMonth = brief.monthlyPromo ? currentMonthKey() : state.marketing.monthlyPromoMonth || "";
     state.marketing.generatedDrafts = buildMarketingDrafts(brief);
     state.marketing.selectedDraftIndex = 0;
     el.marketingObjective.value = brief.objective;
@@ -1048,6 +1053,7 @@
     state.marketing.lastObjective = brief.objective;
     state.marketing.monthlyPromo = brief.monthlyPromo;
     state.marketing.monthlyPromoUpdatedAt = brief.monthlyPromo ? new Date().toISOString() : state.marketing.monthlyPromoUpdatedAt || "";
+    state.marketing.monthlyPromoMonth = brief.monthlyPromo ? currentMonthKey() : state.marketing.monthlyPromoMonth || "";
     el.marketingObjective.value = brief.objective;
     state.marketing.posts.unshift(post);
     saveState();
@@ -1067,6 +1073,7 @@
   function saveMarketingPromo() {
     state.marketing.monthlyPromo = cleanMarketingText(el.marketingMonthlyPromo.value);
     state.marketing.monthlyPromoUpdatedAt = state.marketing.monthlyPromo ? new Date().toISOString() : "";
+    state.marketing.monthlyPromoMonth = state.marketing.monthlyPromo ? currentMonthKey() : "";
     saveState();
     renderMarketing();
     toast(state.marketing.monthlyPromo ? "Monthly promo saved." : "Monthly promo cleared.");
@@ -1076,12 +1083,13 @@
     if (!window.fetch || !navigator.onLine) return;
     const lastFetch = dateValue(state.marketing.lastPromoFetchAt);
     if (lastFetch && Date.now() - lastFetch < 24 * 60 * 60 * 1000) return;
-    await refreshMarketingPromos({ applyTop: !state.marketing.monthlyPromo, quiet: true });
+    await refreshMarketingPromos({ applyTop: shouldRotateMonthlyPromo(), quiet: true, regenerateDrafts: true });
   }
 
   async function refreshMarketingPromos(options = {}) {
     const applyTop = Boolean(options.applyTop);
     const quiet = Boolean(options.quiet);
+    const regenerateDrafts = Boolean(options.regenerateDrafts);
     if (!window.fetch) {
       state.marketing.promoFetchError = "Promo refresh is not available in this browser.";
       renderMarketing();
@@ -1103,7 +1111,13 @@
       if (!suggestions.length) throw new Error("No promo suggestions found");
       if (applyTop) {
         applyMarketingPromoSuggestion(suggestions[0]);
-        if (!quiet) generateMarketingDrafts();
+        if (!quiet) {
+          generateMarketingDrafts();
+        } else if (regenerateDrafts && state.marketing.generatedDrafts.length) {
+          const brief = readMarketingBrief();
+          state.marketing.generatedDrafts = buildMarketingDrafts(brief);
+          state.marketing.selectedDraftIndex = 0;
+        }
       }
       saveState();
       renderMarketing();
@@ -1135,6 +1149,7 @@
     const objective = inferMarketingObjectiveFromPromo(text, promo.objective || state.marketing.lastObjective);
     state.marketing.monthlyPromo = text;
     state.marketing.monthlyPromoUpdatedAt = new Date().toISOString();
+    state.marketing.monthlyPromoMonth = currentMonthKey();
     state.marketing.lastObjective = objective;
     if (el.marketingMonthlyPromo) el.marketingMonthlyPromo.value = text;
     if (el.marketingObjective) el.marketingObjective.value = objective;
@@ -1301,6 +1316,12 @@
     if (campaign.interest === "internet") return "I can check what speeds are available at the address and help compare the monthly options.";
     if (campaign.interest === "mobile") return "I can check line count, phone options, eligibility, and what the monthly number would look like.";
     return "I can check whether the promo fits your home, phone lines, or business setup before you decide.";
+  }
+
+  function shouldRotateMonthlyPromo() {
+    if (!state.marketing.monthlyPromo) return true;
+    const promoMonth = state.marketing.monthlyPromoMonth || monthKeyFromDate(state.marketing.monthlyPromoUpdatedAt);
+    return promoMonth !== currentMonthKey();
   }
 
   function marketingCta(channel, contact) {
@@ -2540,6 +2561,7 @@
       lastObjective: normalizeMarketingObjective(source.lastObjective || source.generatedDrafts?.[0]?.objective || source.posts?.[0]?.objective || "address-check"),
       monthlyPromo: cleanMarketingText(source.monthlyPromo || ""),
       monthlyPromoUpdatedAt: source.monthlyPromoUpdatedAt || "",
+      monthlyPromoMonth: source.monthlyPromoMonth || monthKeyFromDate(source.monthlyPromoUpdatedAt),
       promoSuggestions: normalizePromoSuggestions(source.promoSuggestions),
       lastPromoFetchAt: source.lastPromoFetchAt || "",
       promoFetchError: source.promoFetchError || "",
@@ -3154,6 +3176,16 @@
 
   function dateStamp() {
     return new Date().toISOString().slice(0, 10);
+  }
+
+  function currentMonthKey() {
+    return monthKeyFromDate(new Date());
+  }
+
+  function monthKeyFromDate(value) {
+    const date = value ? new Date(value) : new Date();
+    if (Number.isNaN(date.getTime())) return "";
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
   }
 
   function downloadFile(filename, content, type) {

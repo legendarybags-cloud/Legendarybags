@@ -44,9 +44,9 @@ Best results come from a close, sharp, straight photo. If OCR misses anything, e
 
 ## Facebook marketing
 
-The Marketing tab generates three local post drafts from Zirrus-style campaign presets: address availability, fiber speed, Smart Wi-Fi 6, internet plus mobile bundle savings, mobile AutoPay savings, iPhone/trade-in offers, local service, and business internet/phone. Use Refresh from Zirrus to pull official promo suggestions from public Zirrus pages, or paste the current monthly Zirrus Facebook or Instagram promo into the Monthly Zirrus promo box, then generate drafts that quote that offer in a more natural local voice. The default contact is Nick Williams at `336-986-6691` and `nick.williams@zirrus.com`, so drafts steer people to contact him directly instead of sending them to the site.
+The Marketing tab generates three local post drafts from Zirrus-style campaign presets: address availability, fiber speed, Smart Wi-Fi 6, internet plus mobile bundle savings, mobile AutoPay savings, iPhone/trade-in offers, local service, and business internet/phone. Use Refresh from Zirrus to pull official promo suggestions from public Zirrus pages, or paste the current monthly Zirrus Facebook or Instagram promo into the Monthly Zirrus promo box, then generate drafts that quote that offer in a more natural local voice. Saved promos are marked by calendar month; when the month changes, the next successful refresh replaces the old promo and refreshes stored drafts. The default contact is Nick Williams at `336-986-6691` and `nick.williams@zirrus.com`, so drafts steer people to contact him directly instead of sending them to the site.
 
-Cloudflare Pages serves `/api/promos`, which reads public Zirrus pages and returns normalized promo suggestions. Facebook and Instagram can block automated reads, so manual paste remains the fallback for social-only promos.
+Cloudflare Pages serves `/api/promos`, which reads public Zirrus pages and returns normalized promo suggestions. Facebook and Instagram can block automated reads; social-only promo automation needs Meta's official Pages/Instagram APIs and approved account access, so manual paste remains the fallback until that connection exists.
 
 Save the best draft to the posting queue, copy it into your Facebook Business Page or approved local groups, then mark it posted and track responses/leads.
 
