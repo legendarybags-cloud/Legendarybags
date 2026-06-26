@@ -490,6 +490,10 @@ button:focus-visible {
   grid-row: span 3;
 }
 
+#dashboardView .autopilot-block {
+  grid-column: 1;
+}
+
 #dashboardView .side-block {
   grid-column: 2;
 }
@@ -598,6 +602,60 @@ button:focus-visible {
   color: var(--muted);
   font-size: 0.88rem;
   font-weight: 700;
+}
+
+.work-card,
+.rule-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.work-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.work-card.featured {
+  border-left: 5px solid var(--teal);
+  box-shadow: var(--shadow);
+}
+
+.work-card.text {
+  border-left-color: var(--focus);
+}
+
+.work-card.marketing {
+  border-left-color: var(--green);
+}
+
+.inbox-list,
+.rule-list {
+  display: grid;
+  gap: 10px;
+}
+
+.rule-row {
+  padding: 11px 12px;
+}
+
+.rule-row strong,
+.rule-row span {
+  display: block;
+}
+
+.rule-row strong {
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.rule-row span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-top: 4px;
 }
 
 .section-block {
@@ -1145,6 +1203,7 @@ button:focus-visible {
   }
 
   #dashboardView .priority-block,
+  #dashboardView .autopilot-block,
   #dashboardView .side-block,
   #dashboardView .insight-block {
     grid-column: 1;

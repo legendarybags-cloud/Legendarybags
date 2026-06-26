@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#17324d" />
     <title>Lead Assistant</title>
-    <link rel="manifest" href="manifest.webmanifest?v=22" />
-    <link rel="stylesheet" href="styles.css?v=22" />
+    <link rel="manifest" href="manifest.webmanifest?v=23" />
+    <link rel="stylesheet" href="styles.css?v=23" />
   </head>
   <body>
     <header class="app-header">
@@ -280,15 +280,41 @@
               <p>Capture new leads, follow up with due customers, quote packages, and build Facebook posts from one clean home screen.</p>
             </div>
             <div class="home-actions">
-              <button class="primary-button" id="openCaptureButton" type="button">New lead</button>
-              <button class="secondary-button" data-jump-view="leads" type="button">Find customer</button>
-              <button class="secondary-button" data-jump-view="texts" type="button">Text queue</button>
-              <button class="secondary-button" data-jump-view="quote" type="button">Quick quote</button>
-              <button class="secondary-button" data-jump-view="marketing" type="button">Facebook post</button>
+              <button class="primary-button" id="workNextButton" type="button">Work next</button>
+              <button class="secondary-button" id="openCaptureButton" type="button">Add lead</button>
+              <button class="secondary-button" data-scroll-target="unifiedInboxBlock" type="button">Inbox</button>
+              <button class="secondary-button" data-jump-view="marketing" type="button">Facebook</button>
             </div>
           </div>
           <div class="save-status" id="saveStatus"></div>
           <div class="stats-grid" id="statsGrid"></div>
+          <div class="section-block autopilot-block">
+            <div class="section-heading">
+              <div>
+                <h2>Work next</h2>
+                <p>One recommended action with quick outcome buttons.</p>
+              </div>
+            </div>
+            <div id="workNextPanel"></div>
+          </div>
+          <div class="section-block side-block" id="unifiedInboxBlock">
+            <div class="section-heading">
+              <div>
+                <h2>Inbox</h2>
+                <p>Fix unsaved texts, missing follow-ups, due leads, and post reminders.</p>
+              </div>
+            </div>
+            <div id="unifiedInboxList"></div>
+          </div>
+          <div class="section-block side-block">
+            <div class="section-heading">
+              <div>
+                <h2>Autopilot rules</h2>
+                <p>Automatic next-step cleanup after your taps.</p>
+              </div>
+            </div>
+            <div id="automationRulesList"></div>
+          </div>
           <div class="section-block priority-block">
             <div class="section-heading">
               <div>
@@ -503,7 +529,7 @@
               </div>
               <div class="button-row">
                 <button class="primary-button" id="postSelectedToMetaButton" type="button">Copy + open Facebook</button>
-                <button class="secondary-button" id="openMetaPlannerButton" type="button">Business Suite</button>
+                <button class="secondary-button" id="openBusinessSuiteQuickButton" type="button">Business Suite</button>
                 <button class="secondary-button" id="refreshMetaStatusButton" type="button">Check</button>
                 <button class="secondary-button" id="connectMetaButton" type="button">Advanced connect</button>
                 <button class="secondary-button" id="disconnectMetaButton" type="button">Disconnect</button>
@@ -721,7 +747,7 @@
     </main>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="vendor/tesseract.min.js?v=22"></script>
-    <script src="app.js?v=22"></script>
+    <script src="vendor/tesseract.min.js?v=23"></script>
+    <script src="app.js?v=23"></script>
   </body>
 </html>

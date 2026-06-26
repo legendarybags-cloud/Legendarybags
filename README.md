@@ -15,7 +15,10 @@ A local-first lead tracker for phone and internet sales follow-up.
 - Groups imported text conversations by phone number, keeps a collapsible conversation snippet, finds unsaved contacts, and lets you create/update leads from them.
 - Sets quick text follow-ups on imported contacts, then carries those follow-ups into the saved customer record when linked.
 - Creates appointment reminder text/email drafts and downloadable calendar events.
-- Shows a Today Queue, daily closeout numbers, productivity stats, hot leads, due follow-ups, and upcoming appointments.
+- Shows a cleaner command center with Work Next, unified Inbox, Today Queue, daily closeout numbers, productivity stats, hot leads, due follow-ups, and upcoming appointments.
+- Scores the next best action across leads, appointments, unsaved text contacts, missing follow-ups, and due Facebook posts.
+- Applies autopilot follow-up rules after calls, texts, emails, no answers, interest, and appointment outcomes.
+- Shows a customer timeline on lead cards so you can quickly see calls, texts, outcomes, follow-ups, and appointments.
 - Opens to a cleaner Today command center with the lead capture form folded until you need it.
 - Uses collapsible mobile sections so customer info, quote, workflow, follow-up, and notes do not all compete on one screen.
 - Keeps lead cards compact by showing the main contact buttons first and putting extra actions, notes, and activity behind expanders.
@@ -44,9 +47,12 @@ Android and browser PWAs cannot silently read the whole Messages database. A tru
 
 ## Workflow tools
 
+- Work Next gives you one recommended item at a time and quick buttons for call, text, no answer, interested, open, create lead, or post tracking.
+- Inbox combines due leads, missing follow-ups, unsaved text contacts, and Facebook post reminders in one place.
 - Dashboard shows a prioritized Today Queue, due follow-ups, upcoming appointments, hot leads, daily closeout, and productivity stats.
 - Each lead has quick actions for call, text, email, appointment reminder text/email, map, calendar event, quote copy, summary copy, and follow-up scheduling.
 - Outcome buttons log common actions such as no answer, left voicemail, texted, interested, needs approval, bad number, sold, and not interested.
+- Contact actions set practical defaults automatically: calls follow up in 2 hours, texts follow up tomorrow, and emails follow up in 3 days unless you already set a useful future reminder.
 - Appointment buttons mark confirmed, completed, missed, or needs reschedule.
 - Appointment reminders use drafts so you can review before sending.
 - Calendar downloads create an `.ics` file you can add to your phone calendar.

@@ -299,6 +299,7 @@
     metaConnectionStatus: document.getElementById("metaConnectionStatus"),
     metaConnectionPill: document.getElementById("metaConnectionPill"),
     openBusinessSuiteButton: document.getElementById("openBusinessSuiteButton"),
+    openBusinessSuiteQuickButton: document.getElementById("openBusinessSuiteQuickButton"),
     openMetaPlannerButton: document.getElementById("openMetaPlannerButton"),
     generatedPosts: document.getElementById("generatedPosts"),
     marketingQueue: document.getElementById("marketingQueue"),
@@ -352,6 +353,10 @@
     enableAlertsButton: document.getElementById("enableAlertsButton"),
     installButton: document.getElementById("installButton"),
     markDailyReviewButton: document.getElementById("markDailyReviewButton"),
+    workNextButton: document.getElementById("workNextButton"),
+    workNextPanel: document.getElementById("workNextPanel"),
+    unifiedInboxList: document.getElementById("unifiedInboxList"),
+    automationRulesList: document.getElementById("automationRulesList"),
     openCaptureButton: document.getElementById("openCaptureButton"),
     toast: document.getElementById("toast")
   };
@@ -557,6 +562,9 @@
     document.querySelectorAll("[data-jump-view]").forEach((button) => {
       button.addEventListener("click", () => switchView(button.dataset.jumpView));
     });
+    document.querySelectorAll("[data-scroll-target]").forEach((button) => {
+      button.addEventListener("click", () => scrollToId(button.dataset.scrollTarget));
+    });
 
     el.leadForm.addEventListener("submit", saveLeadFromForm);
     el.cancelEditButton.addEventListener("click", () => {
@@ -582,6 +590,7 @@
     el.postSelectedToMetaButton.addEventListener("click", postSelectedDraftToMeta);
     el.disconnectMetaButton.addEventListener("click", disconnectMetaPage);
     el.openBusinessSuiteButton.addEventListener("click", openBusinessSuite);
+    el.openBusinessSuiteQuickButton.addEventListener("click", openBusinessSuite);
     el.openMetaPlannerButton.addEventListener("click", openBusinessSuite);
     el.saveMarketingGroupsButton.addEventListener("click", saveMarketingGroups);
     el.textPhotoInput.addEventListener("change", (event) => handleTextFileSelected(event, "photo"));
@@ -624,6 +633,7 @@
     el.enableAlertsButton.addEventListener("click", enableAlerts);
     el.installButton.addEventListener("click", installApp);
     el.markDailyReviewButton.addEventListener("click", markDailyReview);
+    el.workNextButton.addEventListener("click", focusWorkNext);
   }
 
   function setupInstallSupport() {
@@ -728,6 +738,9 @@
   function renderAll() {
     renderSaveStatus();
     renderStats();
+    renderWorkNextPanel();
+    renderUnifiedInbox();
+    renderAutomationRules();
     renderTodayQueue();
     renderDueLeads();
     renderAppointments();
@@ -792,6 +805,210 @@
     el.statsGrid.innerHTML = stats
       .map(([label, value]) => `<div class="stat-card"><strong>${value}</strong><span>${escapeHtml(label)}</span></div>`)
       .join("");
+  }
+
+  function renderWorkNextPanel() {
+    if (!el.workNextPanel) return;
+    const item = buildWorkQueue()[0];
+    if (!item) {
+      el.workNextPanel.innerHTML = `<div class="empty-state">Nothing urgent. Add a lead, refresh promos, or review tomorrow's appointments.</div>`;
+      return;
+    }
+    el.workNextPanel.innerHTML = renderWorkItemCard(item, true);
+    bindAutopilotActions(el.workNextPanel);
+  }
+
+  function renderUnifiedInbox() {
+    if (!el.unifiedInboxList) return;
+    const items = buildWorkQueue().slice(0, 12);
+    el.unifiedInboxList.innerHTML = items.length
+      ? `<div class="inbox-list">${items.map((item) => renderWorkItemCard(item, false)).join("")}</div>`
+      : `<div class="empty-state">Inbox is clear. New texts, due follow-ups, missing reminders, and queued posts will show here.</div>`;
+    bindAutopilotActions(el.unifiedInboxList);
+  }
+
+  function renderAutomationRules() {
+    if (!el.automationRulesList) return;
+    const rules = [
+      ["Call opened", "sets a 2 hour follow-up unless an outcome overrides it"],
+      ["Text opened", "sets tomorrow morning follow-up and logs the touch"],
+      ["Email opened", "sets a 3 day follow-up"],
+      ["No answer", "sets a 2 hour follow-up"],
+      ["Interested", "marks hot and follows up in 2 hours"],
+      ["Appointment missed", "marks hot and follows up in 30 minutes"]
+    ];
+    el.automationRulesList.innerHTML = `
+      <div class="rule-list">
+        ${rules.map(([title, detail]) => `<div class="rule-row"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(detail)}</span></div>`).join("")}
+      </div>
+    `;
+  }
+
+  function buildWorkQueue() {
+    const now = new Date();
+    const items = [];
+    state.leads
+      .filter((lead) => !["won", "lost"].includes(lead.status))
+      .forEach((lead) => {
+        const missingFollowUp = !lead.followUpAt && lead.status !== "new";
+        const untouchedNew = lead.status === "new" && !lead.lastTouchAt;
+        let reason = "";
+        let score = leadUrgencyScore(lead, now);
+        if (isAppointmentSoon(lead, now)) {
+          reason = "Appointment within 1 hour";
+          score += 150;
+        } else if (isAppointmentToday(lead, now)) {
+          reason = "Appointment today";
+          score += 125;
+        } else if (isDue(lead, now)) {
+          reason = "Due follow-up";
+          score += 115;
+        } else if (lead.priority === "hot") {
+          reason = missingFollowUp ? "Hot lead needs a follow-up time" : "Hot lead";
+          score += 85;
+        } else if (untouchedNew) {
+          reason = "New lead untouched";
+          score += 70;
+        } else if (missingFollowUp) {
+          reason = "Missing follow-up";
+          score += 55;
+        }
+        if (!reason) return;
+        items.push({
+          type: "lead",
+          id: lead.id,
+          title: lead.name || lead.phone || "Unnamed lead",
+          subtitle: formatContact(lead) || labelStatus(lead.status),
+          detail: lead.followUpAt ? `Follow-up ${formatDateTime(lead.followUpAt)}` : quoteSummaryText(lead.quote, { sms: true }),
+          reason,
+          score,
+          lead
+        });
+      });
+
+    state.texting.importedContacts
+      .filter((contact) => contact.phone && !contact.linkedLeadId && !findLeadByPhone(contact.phone))
+      .forEach((contact) => {
+        const due = contact.followUpAt && dateValue(contact.followUpAt) <= now.getTime();
+        items.push({
+          type: "text",
+          id: contact.id,
+          title: contact.name || formatPhoneDisplay(contact.phone) || "Unsaved text contact",
+          subtitle: formatPhoneDisplay(contact.phone),
+          detail: contact.snippet || "Imported text contact",
+          reason: due ? "Text follow-up due" : "Unsaved text contact",
+          score: due ? 105 : 62,
+          contact
+        });
+      });
+
+    (state.marketing.posts || [])
+      .filter((post) => post.status === "planned" && post.scheduledAt && dateValue(post.scheduledAt) <= now.getTime())
+      .forEach((post) => {
+        items.push({
+          type: "marketing",
+          id: post.id,
+          title: labelMarketingObjective(post.objective),
+          subtitle: labelMarketingChannel(post.channel),
+          detail: post.text || post.offer || "",
+          reason: "Facebook post due",
+          score: 48,
+          post
+        });
+      });
+
+    return items.sort((a, b) => b.score - a.score || String(a.title).localeCompare(String(b.title)));
+  }
+
+  function renderWorkItemCard(item, featured) {
+    const lead = item.lead;
+    const contact = item.contact;
+    const post = item.post;
+    const typeClass = item.type === "lead" ? "lead" : item.type === "text" ? "text" : "marketing";
+    const actions =
+      item.type === "lead"
+        ? `
+          <button class="secondary-button" data-auto-action="call" type="button" ${lead.phone ? "" : "disabled"}>Call</button>
+          <button class="secondary-button" data-auto-action="text" type="button" ${lead.phone && lead.smsConsent ? "" : "disabled"}>Text</button>
+          <button class="secondary-button" data-auto-action="noAnswer" type="button">No answer</button>
+          <button class="secondary-button" data-auto-action="interested" type="button">Interested</button>
+          <button class="primary-button" data-auto-action="edit" type="button">Open</button>
+        `
+        : item.type === "text"
+          ? `
+            <button class="secondary-button" data-auto-action="textContact" type="button">Text</button>
+            <button class="secondary-button" data-auto-action="followContactTomorrow" type="button">Tomorrow</button>
+            <button class="primary-button" data-auto-action="createLead" type="button">Create lead</button>
+          `
+          : `
+            <button class="secondary-button" data-auto-action="copyPost" type="button">Copy</button>
+            <button class="secondary-button" data-auto-action="openFacebook" type="button">Open</button>
+            <button class="primary-button" data-auto-action="posted" type="button">Posted</button>
+          `;
+    return `
+      <article class="work-card ${featured ? "featured" : ""} ${typeClass}" data-work-type="${escapeHtml(item.type)}" data-work-id="${escapeHtml(item.id)}">
+        <div>
+          <span class="summary-kicker">${escapeHtml(item.reason)}</span>
+          <h3 class="lead-name">${escapeHtml(item.title)}</h3>
+          ${item.subtitle ? `<p class="lead-meta">${escapeHtml(item.subtitle)}</p>` : ""}
+          ${item.detail ? `<p class="lead-meta quote-line">${escapeHtml(String(item.detail).slice(0, featured ? 220 : 140))}</p>` : ""}
+        </div>
+        <div class="lead-actions primary-lead-actions">${actions}</div>
+      </article>
+    `;
+  }
+
+  function bindAutopilotActions(container) {
+    container.querySelectorAll("[data-auto-action]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        const card = event.target.closest("[data-work-type]");
+        if (!card) return;
+        handleAutopilotAction(card.dataset.workType, card.dataset.workId, button.dataset.autoAction);
+      });
+    });
+  }
+
+  function handleAutopilotAction(type, id, action) {
+    if (type === "lead") {
+      if (action === "edit") {
+        const lead = state.leads.find((item) => item.id === id);
+        if (lead) loadLeadIntoForm(lead);
+        return;
+      }
+      if (action === "call") return handleLeadAction(id, "call");
+      if (action === "text") return handleLeadAction(id, "smsInitial");
+      if (action === "noAnswer") return handleLeadAction(id, "outcomeNoAnswer");
+      if (action === "interested") return handleLeadAction(id, "outcomeInterested");
+      return;
+    }
+
+    if (type === "text") {
+      if (action === "createLead") return createLeadFromTextContact(id);
+      if (action === "textContact") return openTextContact(id);
+      if (action === "followContactTomorrow") return scheduleTextContactFollowUp(id, "tomorrow");
+      return;
+    }
+
+    if (type === "marketing") {
+      if (action === "copyPost") return handleMarketingAction(id, "copy");
+      if (action === "openFacebook") return openBusinessSuite();
+      if (action === "posted") return handleMarketingAction(id, "posted");
+    }
+  }
+
+  function focusWorkNext() {
+    const item = buildWorkQueue()[0];
+    if (!item) {
+      toast("Nothing urgent right now.");
+      return;
+    }
+    scrollToId("workNextPanel");
+  }
+
+  function scrollToId(id) {
+    const target = document.getElementById(id);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function renderTodayQueue() {
@@ -1972,7 +2189,7 @@
     const contact = item.contactId ? state.texting.importedContacts.find((contactItem) => contactItem.id === item.contactId) : null;
     if (lead) {
       addLog(lead.id, "Text", `Opened text queue: ${item.reason}`);
-      updateLead(lead.id, { status: "contacted", lastTouchAt: new Date().toISOString() }, false);
+      updateLead(lead.id, contactAutoPatch(lead, "text", ""), false);
     }
     if (contact) {
       contact.stage = "waiting";
@@ -2337,11 +2554,6 @@
       lead.emailConsent ? "Email OK" : "No email consent"
     ].join(" | ");
     const statusClass = lead.status === "won" ? "closed" : lead.status === "lost" ? "lost" : due ? "warning" : "";
-    const log = (lead.contactLog || [])
-      .slice(-3)
-      .reverse()
-      .map((entry) => `<p class="log-line">${escapeHtml(formatDateTime(entry.at))}: ${escapeHtml(entry.type)} - ${escapeHtml(entry.note || "")}</p>`)
-      .join("");
     const compactClass = compact ? " compact-card" : "";
     const quoteLine = quote.total > 0 ? quoteSummaryText(lead.quote, { sms: true }) : "No quote selected";
     const appointmentLine = lead.appointmentAt ? `Appointment: ${formatDateTime(lead.appointmentAt)}` : "";
@@ -2423,9 +2635,26 @@
             <button class="danger-button" data-action="outcomeNotInterested" type="button">Not interested</button>
           </div>
         </details>
-        ${log ? `<details class="lead-log"><summary>Last activity</summary><div class="log-list">${log}</div></details>` : ""}
+        ${renderLeadTimeline(lead, compact)}
       </article>
     `;
+  }
+
+  function renderLeadTimeline(lead, compact) {
+    const entries = [
+      { at: lead.createdAt, type: "Created", note: lead.source ? `Source: ${lead.source}` : "Lead saved" },
+      ...(lead.contactLog || [])
+    ];
+    if (lead.followUpAt) entries.push({ at: lead.followUpAt, type: "Next follow-up", note: labelNextStep(lead.nextStep) });
+    if (lead.appointmentAt) entries.push({ at: lead.appointmentAt, type: "Appointment", note: labelAppointmentStatus(lead.appointmentStatus) });
+    const rows = entries
+      .filter((entry) => entry.at)
+      .sort((a, b) => dateValue(b.at) - dateValue(a.at))
+      .slice(0, compact ? 4 : 10)
+      .map((entry) => `<p class="log-line">${escapeHtml(formatDateTime(entry.at))}: ${escapeHtml(entry.type)} - ${escapeHtml(entry.note || "")}</p>`)
+      .join("");
+    if (!rows) return "";
+    return `<details class="lead-log"><summary>Timeline</summary><div class="log-list">${rows}</div></details>`;
   }
 
   function bindLeadActions(container) {
@@ -2459,6 +2688,7 @@
 
     if (action === "call") {
       addLog(id, "Call", "Started call");
+      applyContactAutoFollowUp(id, "call");
       location.href = `tel:${cleanPhone(lead.phone)}`;
       return;
     }
@@ -2969,7 +3199,7 @@
     }
     const body = renderTemplate(state.templates[templateKey], lead);
     addLog(lead.id, "Text", logLabelForTemplate(templateKey, "text"));
-    updateLead(lead.id, { status: "contacted", lastTouchAt: new Date().toISOString() }, false);
+    updateLead(lead.id, contactAutoPatch(lead, "text", templateKey), false);
     location.href = `sms:${cleanPhone(lead.phone)}?body=${encodeURIComponent(body)}`;
   }
 
@@ -2984,8 +3214,38 @@
         ? `${state.settings.businessName || "Zirrus"} appointment reminder`
         : `${state.settings.businessName || "Zirrus"} quote: ${quoteTitle(lead.quote)}`;
     addLog(lead.id, "Email", logLabelForTemplate(templateKey, "email"));
-    updateLead(lead.id, { status: "contacted", lastTouchAt: new Date().toISOString() }, false);
+    updateLead(lead.id, contactAutoPatch(lead, "email", templateKey), false);
     location.href = `mailto:${lead.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }
+
+  function applyContactAutoFollowUp(id, channel) {
+    const lead = state.leads.find((item) => item.id === id);
+    if (!lead || ["won", "lost"].includes(lead.status)) return;
+    updateLead(id, contactAutoPatch(lead, channel, ""), false);
+  }
+
+  function contactAutoPatch(lead, channel, templateKey) {
+    const now = new Date().toISOString();
+    const patch = { status: "contacted", lastTouchAt: now };
+    if (["won", "lost"].includes(lead.status)) return { lastTouchAt: now };
+    if (templateKey && templateKey.toLowerCase().includes("appointment")) {
+      patch.nextStep = "appointment";
+      return patch;
+    }
+    const hasUsefulFutureFollowUp = lead.followUpAt && dateValue(lead.followUpAt) > Date.now() + 10 * 60 * 1000;
+    if (hasUsefulFutureFollowUp) return patch;
+    if (channel === "call") {
+      patch.status = "follow-up";
+      patch.nextStep = "call";
+      patch.followUpAt = toLocalDatetimeValue(hoursFromNow(2));
+    } else if (channel === "text") {
+      patch.nextStep = "waiting";
+      patch.followUpAt = toLocalDatetimeValue(tomorrowMorning());
+    } else if (channel === "email") {
+      patch.nextStep = "waiting";
+      patch.followUpAt = toLocalDatetimeValue(daysFromNow(3));
+    }
+    return patch;
   }
 
   function renderTemplate(template, lead) {
