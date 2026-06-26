@@ -96,6 +96,16 @@
     posts: []
   };
 
+  const textingDefaults = {
+    importText: "",
+    importedContacts: [],
+    queueAudience: "due",
+    queueTemplate: "",
+    queue: [],
+    selectedQueueId: "",
+    lastImportAt: ""
+  };
+
   const contactDefaults = {
     repName: "Nick Williams",
     businessName: "Zirrus",
@@ -217,6 +227,7 @@
     },
     leads: [],
     marketing: clone(marketingDefaults),
+    texting: clone(textingDefaults),
     dailyReviewAt: "",
     lastBackupAt: "",
     lastSavedAt: ""
@@ -294,6 +305,22 @@
     marketingStats: document.getElementById("marketingStats"),
     marketingGroupsText: document.getElementById("marketingGroupsText"),
     saveMarketingGroupsButton: document.getElementById("saveMarketingGroupsButton"),
+    textPhotoInput: document.getElementById("textPhotoInput"),
+    textFileInput: document.getElementById("textFileInput"),
+    textOcrPreview: document.getElementById("textOcrPreview"),
+    textOcrStatus: document.getElementById("textOcrStatus"),
+    textImportText: document.getElementById("textImportText"),
+    scanTextsButton: document.getElementById("scanTextsButton"),
+    clearTextImportButton: document.getElementById("clearTextImportButton"),
+    textImportResults: document.getElementById("textImportResults"),
+    textAudience: document.getElementById("textAudience"),
+    textQueueTemplate: document.getElementById("textQueueTemplate"),
+    buildTextQueueButton: document.getElementById("buildTextQueueButton"),
+    openNextTextButton: document.getElementById("openNextTextButton"),
+    copySelectedTextButton: document.getElementById("copySelectedTextButton"),
+    textQueueList: document.getElementById("textQueueList"),
+    textContactList: document.getElementById("textContactList"),
+    textingStats: document.getElementById("textingStats"),
     pricingTables: document.getElementById("pricingTables"),
     leadList: document.getElementById("leadList"),
     todayQueueList: document.getElementById("todayQueueList"),
@@ -342,6 +369,7 @@
   function init() {
     populateQuoteSelects();
     fillEditors();
+    handleIncomingShare();
     renderPricingTables();
     renderQuoteSummaries();
     renderAll();
@@ -387,6 +415,7 @@
       settings: normalizeSettings({ ...defaults.settings, ...(imported.settings || {}) }),
       templates: { ...defaults.templates, ...(imported.templates || {}) },
       marketing: normalizeMarketing(imported.marketing),
+      texting: normalizeTexting(imported.texting),
       leads,
       lastBackupAt: imported.lastBackupAt || "",
       lastSavedAt: imported.lastSavedAt || latestSavedAt(imported, leads)
@@ -555,6 +584,21 @@
     el.openBusinessSuiteButton.addEventListener("click", openBusinessSuite);
     el.openMetaPlannerButton.addEventListener("click", openBusinessSuite);
     el.saveMarketingGroupsButton.addEventListener("click", saveMarketingGroups);
+    el.textPhotoInput.addEventListener("change", (event) => handleTextFileSelected(event, "photo"));
+    el.textFileInput.addEventListener("change", (event) => handleTextFileSelected(event, "file"));
+    el.scanTextsButton.addEventListener("click", () => scanTextImport({ quiet: false }));
+    el.clearTextImportButton.addEventListener("click", clearTextImport);
+    el.buildTextQueueButton.addEventListener("click", buildTextQueue);
+    el.openNextTextButton.addEventListener("click", openNextQueuedText);
+    el.copySelectedTextButton.addEventListener("click", copySelectedQueuedText);
+    el.textAudience.addEventListener("change", () => {
+      state.texting.queueAudience = el.textAudience.value;
+      saveState();
+    });
+    el.textQueueTemplate.addEventListener("input", () => {
+      state.texting.queueTemplate = el.textQueueTemplate.value;
+      saveState();
+    });
     document.querySelectorAll("[data-quote-input]").forEach((input) => {
       input.addEventListener("change", renderQuoteSummaries);
       input.addEventListener("input", renderQuoteSummaries);
@@ -676,6 +720,9 @@
     if (el.marketingPageUrl) el.marketingPageUrl.value = state.marketing.pageUrl || "";
     if (el.marketingPostDate && !el.marketingPostDate.value) el.marketingPostDate.value = toLocalDatetimeValue(tomorrowMarketingTime());
     if (el.marketingGroupsText) el.marketingGroupsText.value = state.marketing.groupsText || "";
+    if (el.textImportText) el.textImportText.value = state.texting.importText || "";
+    if (el.textAudience) el.textAudience.value = state.texting.queueAudience || "due";
+    if (el.textQueueTemplate) el.textQueueTemplate.value = state.texting.queueTemplate || defaultTextQueueTemplate();
   }
 
   function renderAll() {
@@ -689,6 +736,7 @@
     renderProductivityStats();
     renderMarketing();
     renderLeads();
+    renderTextOrganizer();
   }
 
   function renderSaveStatus() {
@@ -1519,6 +1567,704 @@
     location.href = url;
   }
 
+  function handleIncomingShare() {
+    const params = new URLSearchParams(window.location.search);
+    const sharedText = [params.get("shareTitle"), params.get("shareText"), params.get("shareUrl")]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+      .join("\n");
+    if (!sharedText) return;
+    state.texting.importText = [state.texting.importText, sharedText].filter(Boolean).join("\n\n");
+    state.texting.lastImportAt = new Date().toISOString();
+    scanTextImport({ quiet: true });
+    switchView("texts");
+    params.delete("shareTitle");
+    params.delete("shareText");
+    params.delete("shareUrl");
+    const query = params.toString();
+    const cleanUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
+    window.history.replaceState({}, document.title, cleanUrl);
+  }
+
+  function renderTextOrganizer() {
+    if (!el.textingStats) return;
+    renderTextingStats();
+    renderTextImportResults();
+    renderTextQueue();
+    renderTextContacts();
+    if (el.textImportText && el.textImportText.value !== state.texting.importText) el.textImportText.value = state.texting.importText || "";
+    if (el.textAudience && el.textAudience.value !== state.texting.queueAudience) el.textAudience.value = state.texting.queueAudience || "due";
+    if (el.textQueueTemplate && el.textQueueTemplate.value !== state.texting.queueTemplate) {
+      el.textQueueTemplate.value = state.texting.queueTemplate || defaultTextQueueTemplate();
+    }
+  }
+
+  function renderTextingStats() {
+    const now = new Date();
+    const textOk = state.leads.filter((lead) => lead.phone && lead.smsConsent && !["won", "lost"].includes(lead.status)).length;
+    const due = state.leads.filter((lead) => lead.phone && lead.smsConsent && isDue(lead, now)).length;
+    const imported = state.texting.importedContacts.length;
+    const unsaved = state.texting.importedContacts.filter((contact) => contact.phone && !contact.linkedLeadId && !findLeadByPhone(contact.phone)).length;
+    const contactFollowUps = state.texting.importedContacts.filter((contact) => contact.followUpAt && dateValue(contact.followUpAt) <= now.getTime()).length;
+    el.textingStats.innerHTML = [
+      ["Text OK", textOk],
+      ["Due texts", due],
+      ["Imported", imported],
+      ["Unsaved", unsaved],
+      ["Text follow-ups", contactFollowUps]
+    ]
+      .map(([label, value]) => `<div class="mini-stat"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`)
+      .join("");
+  }
+
+  function renderTextImportResults() {
+    const contacts = state.texting.importedContacts.slice(0, 5);
+    el.textImportResults.innerHTML = contacts.length
+      ? contacts.map((contact) => renderTextContactCard(contact, true)).join("")
+      : `<div class="empty-state">Paste or share copied texts, then scan to find customer names and numbers.</div>`;
+    bindTextOrganizerActions(el.textImportResults);
+  }
+
+  function renderTextContacts() {
+    const contacts = state.texting.importedContacts;
+    el.textContactList.innerHTML = contacts.length
+      ? contacts.map((contact) => renderTextContactCard(contact, false)).join("")
+      : `<div class="empty-state">No imported text contacts yet.</div>`;
+    bindTextOrganizerActions(el.textContactList);
+  }
+
+  function renderTextContactCard(contact, compact) {
+    const linkedLead = contact.linkedLeadId ? state.leads.find((lead) => lead.id === contact.linkedLeadId) : findLeadByPhone(contact.phone);
+    const linkedLabel = linkedLead ? `Linked: ${linkedLead.name || linkedLead.phone}` : "Not linked";
+    const followUpLine = contact.followUpAt ? `Text follow-up: ${formatDateTime(contact.followUpAt)}` : "";
+    const actionLine = contact.lastAction ? `Last: ${contact.lastAction}${contact.lastActionAt ? ` ${formatDateTime(contact.lastActionAt)}` : ""}` : "";
+    const note = compact
+      ? contact.snippet
+      : [contact.snippet, followUpLine, actionLine, contact.lastImportedAt ? `Imported ${formatDateTime(contact.lastImportedAt)}` : ""].filter(Boolean).join(" | ");
+    return `
+      <article class="text-card" data-contact-id="${escapeHtml(contact.id)}">
+        <div class="lead-topline">
+          <div>
+            <h3 class="lead-name">${escapeHtml(contact.name || "Unknown contact")}</h3>
+            <p class="lead-meta">${escapeHtml([formatPhoneDisplay(contact.phone), contact.email].filter(Boolean).join(" | "))}</p>
+            <p class="lead-meta">${escapeHtml(linkedLabel)}</p>
+            ${note ? `<p class="lead-meta quote-line">${escapeHtml(note)}</p>` : ""}
+          </div>
+          <span class="pill ${linkedLead ? "closed" : contact.followUpAt ? "warning" : ""}">${escapeHtml(linkedLead ? "Customer" : labelTextContactStage(contact.stage))}</span>
+        </div>
+        ${
+          !compact && contact.conversation
+            ? `<details class="lead-note-details text-conversation">
+                <summary>Conversation</summary>
+                <p class="lead-note">${escapeHtml(contact.conversation)}</p>
+              </details>`
+            : ""
+        }
+        <div class="lead-actions primary-lead-actions">
+          <button class="secondary-button" data-text-action="createLead" type="button">${linkedLead ? "Update lead" : "Create lead"}</button>
+          <button class="secondary-button" data-text-action="textContact" type="button">Text</button>
+          <button class="secondary-button" data-text-action="followContact30m" type="button">30 min</button>
+          <button class="secondary-button" data-text-action="followContactTomorrow" type="button">Tomorrow</button>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderTextQueue() {
+    const queue = state.texting.queue || [];
+    el.textQueueList.innerHTML = queue.length
+      ? queue.map(renderTextQueueCard).join("")
+      : `<div class="empty-state">Build a queue from due follow-ups, hot leads, appointments, or imported contacts.</div>`;
+    bindTextOrganizerActions(el.textQueueList);
+  }
+
+  function renderTextQueueCard(item) {
+    const checked = item.id === state.texting.selectedQueueId ? " checked" : "";
+    return `
+      <label class="draft-card text-queue-card" data-queue-id="${escapeHtml(item.id)}">
+        <input type="radio" name="textQueueItem" data-text-action="selectQueue" ${checked} />
+        <span>
+          <strong>${escapeHtml(item.name || item.phone)}</strong>
+          <small>${escapeHtml([formatPhoneDisplay(item.phone), item.reason, item.status === "opened" ? "Opened" : ""].filter(Boolean).join(" | "))}</small>
+          <textarea readonly rows="5">${escapeHtml(item.message)}</textarea>
+          <span class="text-card-actions">
+            <button class="secondary-button" data-text-action="openQueuedText" type="button">Open SMS</button>
+            <button class="secondary-button" data-text-action="copyQueuedText" type="button">Copy</button>
+          </span>
+        </span>
+      </label>
+    `;
+  }
+
+  function bindTextOrganizerActions(container) {
+    container.querySelectorAll("[data-text-action]").forEach((control) => {
+      control.addEventListener("click", (event) => {
+        const action = control.dataset.textAction;
+        const contactCard = control.closest("[data-contact-id]");
+        const queueCard = control.closest("[data-queue-id]");
+        if (action === "createLead" && contactCard) createLeadFromTextContact(contactCard.dataset.contactId);
+        if (action === "textContact" && contactCard) openTextContact(contactCard.dataset.contactId);
+        if (action === "followContact30m" && contactCard) scheduleTextContactFollowUp(contactCard.dataset.contactId, "30m");
+        if (action === "followContactTomorrow" && contactCard) scheduleTextContactFollowUp(contactCard.dataset.contactId, "tomorrow");
+        if (action === "selectQueue" && queueCard) selectQueuedText(queueCard.dataset.queueId);
+        if (action === "openQueuedText" && queueCard) {
+          event.preventDefault();
+          openQueuedText(queueCard.dataset.queueId);
+        }
+        if (action === "copyQueuedText" && queueCard) {
+          event.preventDefault();
+          copyQueuedText(queueCard.dataset.queueId);
+        }
+      });
+    });
+  }
+
+  async function handleTextFileSelected(event, sourceType) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    await processTextImportFile(file, sourceType);
+    event.target.value = "";
+  }
+
+  async function processTextImportFile(file, sourceType) {
+    if (isTextFile(file)) {
+      updateTextOcrStatus("Reading uploaded text...");
+      try {
+        const text = normalizeOcrText(await file.text());
+        const smsContacts = isXmlTextFile(file) ? extractSmsBackupContacts(text) : [];
+        if (smsContacts.length) {
+          state.texting.importedContacts = mergeTextContacts(state.texting.importedContacts, smsContacts);
+          state.texting.lastImportAt = new Date().toISOString();
+          saveState();
+          renderTextOrganizer();
+          updateTextOcrStatus(`SMS backup loaded: ${smsContacts.length} contact${smsContacts.length === 1 ? "" : "s"}`);
+          toast(`Imported ${smsContacts.length} text conversation${smsContacts.length === 1 ? "" : "s"}.`);
+          return;
+        }
+        appendTextImport(text);
+        updateTextOcrStatus(text ? "File text loaded" : "No text found");
+        if (text) scanTextImport({ quiet: false });
+      } catch (error) {
+        updateTextOcrStatus("Could not read that file.");
+        toast("Upload an image, TXT, CSV, MD, or SMS backup XML file.");
+      }
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      updateTextOcrStatus("Unsupported file. Upload an image, TXT, CSV, or MD file.");
+      toast("That file type is not supported yet.");
+      return;
+    }
+
+    el.textOcrPreview.src = URL.createObjectURL(file);
+    el.textOcrPreview.hidden = false;
+    updateTextOcrStatus(sourceType === "photo" ? "Preparing photo..." : "Preparing screenshot...");
+
+    const ocrEngine = getOcrEngine();
+    if (!ocrEngine || typeof ocrEngine.createWorker !== "function") {
+      updateTextOcrStatus("OCR did not load. Use Android text selection or Lens, then paste here.");
+      toast("OCR library is not available.");
+      return;
+    }
+
+    try {
+      const imageForOcr = await preprocessImage(file);
+      const worker = await ocrEngine.createWorker("eng", 1, {
+        logger: (message) => updateTextOcrProgress(message)
+      });
+      updateTextOcrStatus("Reading conversation...");
+      const result = await worker.recognize(imageForOcr);
+      await worker.terminate();
+      const text = normalizeOcrText(result.data.text || "");
+      appendTextImport(text);
+      updateTextOcrStatus(text ? "Conversation text loaded" : "No text found");
+      if (text) scanTextImport({ quiet: false });
+    } catch (error) {
+      updateTextOcrStatus("OCR failed. Try a sharper screenshot.");
+      toast("Could not read that image.");
+    }
+  }
+
+  function appendTextImport(text) {
+    const cleanText = normalizeOcrText(text);
+    if (!cleanText) return;
+    state.texting.importText = [state.texting.importText, cleanText].filter(Boolean).join("\n\n");
+    if (el.textImportText) el.textImportText.value = state.texting.importText;
+  }
+
+  function updateTextOcrStatus(message) {
+    if (el.textOcrStatus) el.textOcrStatus.textContent = message;
+  }
+
+  function updateTextOcrProgress(message) {
+    if (!message || !message.status) return;
+    if (message.progress != null) {
+      updateTextOcrStatus(`${message.status} ${Math.round(message.progress * 100)}%`);
+      return;
+    }
+    updateTextOcrStatus(message.status);
+  }
+
+  function scanTextImport(options = {}) {
+    const text = normalizeOcrText(el.textImportText?.value || state.texting.importText || "");
+    state.texting.importText = text;
+    const contacts = extractTextContacts(text);
+    if (!contacts.length) {
+      saveState();
+      renderTextOrganizer();
+      if (!options.quiet) toast("No phone numbers found in pasted texts.");
+      return;
+    }
+    state.texting.importedContacts = mergeTextContacts(state.texting.importedContacts, contacts);
+    state.texting.lastImportAt = new Date().toISOString();
+    saveState();
+    renderTextOrganizer();
+    if (!options.quiet) toast(`Found ${contacts.length} text contact${contacts.length === 1 ? "" : "s"}.`);
+  }
+
+  function clearTextImport() {
+    state.texting.importText = "";
+    if (el.textImportText) el.textImportText.value = "";
+    if (el.textOcrPreview) {
+      el.textOcrPreview.removeAttribute("src");
+      el.textOcrPreview.hidden = true;
+    }
+    updateTextOcrStatus("Text import ready");
+    saveState();
+    renderTextOrganizer();
+    toast("Text import cleared.");
+  }
+
+  function buildTextQueue() {
+    state.texting.queueAudience = el.textAudience.value;
+    state.texting.queueTemplate = el.textQueueTemplate.value.trim() || defaultTextQueueTemplate();
+    const contacts = contactsForTextAudience(state.texting.queueAudience);
+    state.texting.queue = contacts.map((contact) => ({
+      id: newId(),
+      leadId: contact.leadId || "",
+      contactId: contact.contactId || "",
+      name: contact.name || "",
+      phone: contact.phone || "",
+      message: renderTextQueueMessage(contact),
+      reason: contact.reason || labelTextAudience(state.texting.queueAudience),
+      status: "ready",
+      createdAt: new Date().toISOString()
+    }));
+    state.texting.selectedQueueId = state.texting.queue[0]?.id || "";
+    saveState();
+    renderTextOrganizer();
+    toast(state.texting.queue.length ? `Text queue ready: ${state.texting.queue.length}` : "No eligible contacts for that queue.");
+  }
+
+  function contactsForTextAudience(audience) {
+    const now = new Date();
+    const openLeads = state.leads.filter((lead) => lead.phone && !["won", "lost"].includes(lead.status));
+    const leadContacts = (leads, reason) =>
+      leads
+        .filter((lead) => lead.smsConsent)
+        .map((lead) => ({
+          leadId: lead.id,
+          name: lead.name || lead.phone,
+          phone: lead.phone,
+          reason,
+          lead
+        }));
+    const importedContacts = state.texting.importedContacts
+      .filter((contact) => contact.phone)
+      .map((contact) => ({
+        contactId: contact.id,
+        leadId: contact.linkedLeadId || findLeadByPhone(contact.phone)?.id || "",
+        name: contact.name || contact.phone,
+        phone: contact.phone,
+        reason: "Imported text contact",
+        contact,
+        lead: contact.linkedLeadId ? state.leads.find((lead) => lead.id === contact.linkedLeadId) : findLeadByPhone(contact.phone)
+      }));
+    if (audience === "due") {
+      return [
+        ...leadContacts(openLeads.filter((lead) => isDue(lead, now)), "Due follow-up"),
+        ...importedContacts.filter((contact) => contact.contact?.followUpAt && dateValue(contact.contact.followUpAt) <= now.getTime())
+      ];
+    }
+    if (audience === "hot") return leadContacts(openLeads.filter((lead) => lead.priority === "hot"), "Hot lead");
+    if (audience === "appointments") return leadContacts(openLeads.filter((lead) => isAppointmentToday(lead, now) || isTomorrow(lead.appointmentAt, now)), "Appointment");
+    if (audience === "new") return leadContacts(openLeads.filter((lead) => lead.status === "new"), "New lead");
+    if (audience === "all") return leadContacts(openLeads, "Text OK customer");
+    return importedContacts;
+  }
+
+  function renderTextQueueMessage(contact) {
+    const lead = contact.lead || findLeadByPhone(contact.phone);
+    if (lead) return renderTemplate(state.texting.queueTemplate || defaultTextQueueTemplate(), lead);
+    const data = {
+      firstName: firstName(contact.name),
+      name: contact.name || "",
+      repName: state.settings.repName || contactDefaults.repName,
+      businessName: state.settings.businessName || contactDefaults.businessName,
+      replyPhone: state.settings.replyPhone || contactDefaults.replyPhone
+    };
+    return applyTemplateTokens(state.texting.queueTemplate || defaultTextQueueTemplate(), data);
+  }
+
+  function openNextQueuedText() {
+    const item = selectedQueuedText() || state.texting.queue.find((queued) => queued.status !== "opened") || state.texting.queue[0];
+    if (!item) {
+      toast("Build a text queue first.");
+      return;
+    }
+    openQueuedText(item.id);
+  }
+
+  function copySelectedQueuedText() {
+    const item = selectedQueuedText();
+    if (!item) {
+      toast("Select a queued text first.");
+      return;
+    }
+    copyQueuedText(item.id);
+  }
+
+  function selectQueuedText(id) {
+    state.texting.selectedQueueId = id;
+    saveState();
+    renderTextQueue();
+  }
+
+  function selectedQueuedText() {
+    return state.texting.queue.find((item) => item.id === state.texting.selectedQueueId);
+  }
+
+  function openQueuedText(id) {
+    const item = state.texting.queue.find((queued) => queued.id === id);
+    if (!item) return;
+    item.status = "opened";
+    state.texting.selectedQueueId = item.id;
+    const lead = item.leadId ? state.leads.find((leadItem) => leadItem.id === item.leadId) : findLeadByPhone(item.phone);
+    const contact = item.contactId ? state.texting.importedContacts.find((contactItem) => contactItem.id === item.contactId) : null;
+    if (lead) {
+      addLog(lead.id, "Text", `Opened text queue: ${item.reason}`);
+      updateLead(lead.id, { status: "contacted", lastTouchAt: new Date().toISOString() }, false);
+    }
+    if (contact) {
+      contact.stage = "waiting";
+      contact.lastAction = `Opened queued text: ${item.reason}`;
+      contact.lastActionAt = new Date().toISOString();
+    }
+    saveState();
+    renderAll();
+    location.href = `sms:${cleanPhone(item.phone)}?body=${encodeURIComponent(item.message)}`;
+  }
+
+  function copyQueuedText(id) {
+    const item = state.texting.queue.find((queued) => queued.id === id);
+    if (!item) return;
+    state.texting.selectedQueueId = item.id;
+    saveState();
+    renderTextOrganizer();
+    copyText(item.message);
+  }
+
+  function scheduleTextContactFollowUp(contactId, preset) {
+    const contact = state.texting.importedContacts.find((item) => item.id === contactId);
+    if (!contact?.phone) return;
+    const followUpAt = toLocalDatetimeValue(dateForPreset(preset));
+    const linkedLead = contact.linkedLeadId ? state.leads.find((lead) => lead.id === contact.linkedLeadId) : findLeadByPhone(contact.phone);
+    contact.followUpAt = followUpAt;
+    contact.stage = "follow-up";
+    contact.lastAction = `Follow-up set for ${formatDateTime(followUpAt)}`;
+    contact.lastActionAt = new Date().toISOString();
+
+    if (linkedLead) {
+      contact.linkedLeadId = linkedLead.id;
+      updateLead(
+        linkedLead.id,
+        {
+          status: "follow-up",
+          nextStep: "text",
+          followUpAt
+        },
+        false
+      );
+      addLog(linkedLead.id, "Text follow-up", `Scheduled from text organizer: ${contact.snippet || contact.phone}`);
+    } else {
+      saveState();
+      renderAll();
+    }
+    toast("Text follow-up scheduled.");
+  }
+
+  function createLeadFromTextContact(contactId) {
+    const contact = state.texting.importedContacts.find((item) => item.id === contactId);
+    if (!contact) return;
+    const existing = findLeadByPhone(contact.phone);
+    if (existing) {
+      contact.linkedLeadId = existing.id;
+      const patch = {
+        source: existing.source || "Text import",
+        notes: appendNote(existing.notes, `Text import: ${contact.snippet || contact.phone}`)
+      };
+      if (contact.followUpAt && (!existing.followUpAt || dateValue(contact.followUpAt) <= dateValue(existing.followUpAt))) {
+        patch.status = "follow-up";
+        patch.nextStep = "text";
+        patch.followUpAt = contact.followUpAt;
+      }
+      updateLead(
+        existing.id,
+        patch,
+        false
+      );
+      addLog(existing.id, "Text import", "Linked imported text contact");
+      contact.stage = "linked";
+      contact.lastAction = "Updated saved lead";
+      contact.lastActionAt = new Date().toISOString();
+      saveState();
+      renderAll();
+      toast("Text contact linked to existing lead.");
+      return;
+    }
+    const now = new Date().toISOString();
+    const lead = normalizeLead({
+      id: newId(),
+      createdAt: now,
+      updatedAt: now,
+      name: contact.name || "",
+      source: "Text import",
+      phone: contact.phone,
+      email: contact.email || "",
+      interest: inferInterestFromText(contact.snippet),
+      priority: guessPriority(contact.snippet) || "warm",
+      nextStep: "text",
+      notes: `Imported from text organizer\n${contact.snippet || ""}`,
+      smsConsent: false,
+      emailConsent: false,
+      status: contact.followUpAt ? "follow-up" : "new",
+      followUpAt: contact.followUpAt || "",
+      quote: normalizeQuote(guessQuoteFromText(contact.snippet, 0) || {}),
+      contactLog: [{ at: now, type: "Text import", note: "Created from pasted text" }]
+    });
+    contact.linkedLeadId = lead.id;
+    contact.stage = "linked";
+    contact.lastAction = "Created saved lead";
+    contact.lastActionAt = now;
+    state.leads.unshift(lead);
+    saveState();
+    renderAll();
+    toast("Lead created from text.");
+  }
+
+  function openTextContact(contactId) {
+    const contact = state.texting.importedContacts.find((item) => item.id === contactId);
+    if (!contact?.phone) return;
+    const message = renderTextQueueMessage({ ...contact, contactId: contact.id });
+    contact.stage = "waiting";
+    contact.lastAction = "Opened text";
+    contact.lastActionAt = new Date().toISOString();
+    const linkedLead = contact.linkedLeadId ? state.leads.find((lead) => lead.id === contact.linkedLeadId) : findLeadByPhone(contact.phone);
+    if (linkedLead) {
+      contact.linkedLeadId = linkedLead.id;
+      updateLead(linkedLead.id, { status: "contacted", nextStep: "waiting", lastTouchAt: new Date().toISOString() }, false);
+      addLog(linkedLead.id, "Text", "Opened from text organizer");
+    } else {
+      saveState();
+      renderAll();
+    }
+    location.href = `sms:${cleanPhone(contact.phone)}?body=${encodeURIComponent(message)}`;
+  }
+
+  function extractTextContacts(text) {
+    const normalized = normalizeOcrText(text);
+    const lines = cleanLeadLines(normalized);
+    const phones = [...new Set((normalized.match(/(?:\+?1[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}/g) || []).map((phone) => phone.trim()))];
+    return phones.map((phone) => {
+      const existing = findLeadByPhone(phone);
+      const lineIndex = lines.findIndex((line) => comparablePhone(line).includes(comparablePhone(phone)));
+      const nearby = lineIndex >= 0 ? lines.slice(Math.max(0, lineIndex - 2), lineIndex + 4) : lines.slice(0, 5);
+      const conversation = nearby.join("\n").slice(0, 1200);
+      const snippet = nearby.join(" | ").slice(0, 220);
+      const followUpAt = inferTextFollowUpFromSnippet(conversation);
+      const name = existing?.name || guessNameNearPhone(nearby, phone) || "";
+      const email = nearby.join(" ").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
+      return {
+        id: newId(),
+        name,
+        phone,
+        email,
+        snippet,
+        conversation,
+        stage: existing ? "linked" : followUpAt ? "follow-up" : "needs-review",
+        followUpAt,
+        lastAction: followUpAt ? "Follow-up inferred" : "",
+        lastActionAt: followUpAt ? new Date().toISOString() : "",
+        lastImportedAt: new Date().toISOString(),
+        linkedLeadId: existing?.id || ""
+      };
+    });
+  }
+
+  function extractSmsBackupContacts(xmlText) {
+    const doc = new DOMParser().parseFromString(xmlText, "application/xml");
+    if (doc.querySelector("parsererror")) return [];
+    const smsNodes = Array.from(doc.querySelectorAll("sms,mms"));
+    const byPhone = new Map();
+    smsNodes.forEach((node) => {
+      const address = node.getAttribute("address") || node.getAttribute("contact_number") || "";
+      const phone = comparablePhone(address);
+      if (!phone) return;
+      const body = normalizeOcrText(node.getAttribute("body") || node.textContent || "");
+      const dateMs = Number(node.getAttribute("date")) || 0;
+      const date = dateMs ? new Date(dateMs).toISOString() : "";
+      const contactName = normalizeSmsContactName(node.getAttribute("contact_name") || "");
+      const type = node.getAttribute("type") === "2" ? "Me" : "Customer";
+      const line = [date ? formatDateTime(date) : "", `${type}: ${body}`].filter(Boolean).join(" - ");
+      const existing = byPhone.get(phone) || {
+        id: newId(),
+        name: "",
+        phone: address,
+        email: "",
+        messages: [],
+        lastImportedAt: "",
+        linkedLeadId: findLeadByPhone(phone)?.id || ""
+      };
+      if (contactName && !existing.name) existing.name = contactName;
+      if (body) existing.messages.push({ body, line, dateMs });
+      existing.lastImportedAt = date || existing.lastImportedAt || new Date().toISOString();
+      byPhone.set(phone, existing);
+    });
+
+    return [...byPhone.values()]
+      .map((contact) => {
+        const sortedMessages = contact.messages.sort((a, b) => b.dateMs - a.dateMs);
+        const conversation = sortedMessages.map((message) => message.line || message.body).join("\n").slice(0, 2000);
+        const snippet = sortedMessages.map((message) => message.body).filter(Boolean).join(" | ").slice(0, 260);
+        const followUpAt = inferTextFollowUpFromSnippet(conversation);
+        return {
+          id: contact.id,
+          name: contact.name || findLeadByPhone(contact.phone)?.name || "",
+          phone: contact.phone,
+          email: "",
+          snippet,
+          conversation,
+          stage: contact.linkedLeadId ? "linked" : followUpAt ? "follow-up" : "needs-review",
+          followUpAt,
+          lastAction: followUpAt ? "Follow-up inferred" : "",
+          lastActionAt: followUpAt ? new Date().toISOString() : "",
+          lastImportedAt: contact.lastImportedAt,
+          linkedLeadId: contact.linkedLeadId
+        };
+      })
+      .filter((contact) => contact.phone && contact.snippet)
+      .sort((a, b) => dateValue(b.lastImportedAt) - dateValue(a.lastImportedAt))
+      .slice(0, 500);
+  }
+
+  function normalizeSmsContactName(name) {
+    const value = String(name || "").trim();
+    if (!value || /^null$/i.test(value) || /^\(unknown\)$/i.test(value)) return "";
+    return value;
+  }
+
+  function mergeTextContacts(existingContacts, newContacts) {
+    const byPhone = new Map((existingContacts || []).map((contact) => [comparablePhone(contact.phone), contact]));
+    newContacts.forEach((contact) => {
+      const key = comparablePhone(contact.phone);
+      if (!key) return;
+      const existing = byPhone.get(key);
+      byPhone.set(key, {
+        ...(existing || {}),
+        ...contact,
+        id: existing?.id || contact.id,
+        name: contact.name || existing?.name || "",
+        linkedLeadId: existing?.linkedLeadId || contact.linkedLeadId || "",
+        conversation: mergeConversation(existing?.conversation, contact.conversation || contact.snippet),
+        stage: existing?.stage === "linked" || contact.linkedLeadId ? "linked" : contact.stage || existing?.stage || "needs-review",
+        followUpAt: existing?.followUpAt || contact.followUpAt || "",
+        lastAction: existing?.lastAction || contact.lastAction || "",
+        lastActionAt: existing?.lastActionAt || contact.lastActionAt || "",
+        lastImportedAt: contact.lastImportedAt
+      });
+    });
+    return [...byPhone.values()].sort((a, b) => dateValue(b.lastImportedAt) - dateValue(a.lastImportedAt)).slice(0, 200);
+  }
+
+  function mergeConversation(existing, incoming) {
+    const current = String(existing || "").trim();
+    const next = String(incoming || "").trim();
+    if (!current) return next.slice(0, 2000);
+    if (!next || current.includes(next)) return current.slice(0, 2000);
+    return `${next}\n\n${current}`.slice(0, 2000);
+  }
+
+  function guessNameNearPhone(lines, phone) {
+    const digits = comparablePhone(phone);
+    const directLine = lines.find((line) => comparablePhone(line).includes(digits)) || "";
+    const withoutPhone = directLine.replace(/(?:\+?1[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}/g, "").replace(/\b(phone|mobile|cell|text)\b\s*[:\-]?/gi, "").trim();
+    const directName = guessNameLine([withoutPhone]);
+    return directName || guessNameLine(lines);
+  }
+
+  function findLeadByPhone(phone) {
+    const key = comparablePhone(phone);
+    if (!key) return null;
+    return state.leads.find((lead) => comparablePhone(lead.phone) === key) || null;
+  }
+
+  function inferInterestFromText(text) {
+    const lower = String(text || "").toLowerCase();
+    if (/bundle|internet.*mobile|mobile.*internet/.test(lower)) return "bundle";
+    if (/internet|fiber|gig|mbps|wifi|wi-fi/.test(lower)) return "internet";
+    if (/mobile|phone|line|iphone|android/.test(lower)) return "mobile";
+    return "";
+  }
+
+  function inferTextFollowUpFromSnippet(text) {
+    const lower = String(text || "").toLowerCase();
+    if (!/\b(follow|later|tomorrow|next week|call back|text back|remind|appointment|appt)\b/.test(lower)) return "";
+    if (/\b(30|thirty)\s*(min|minute)/.test(lower)) return toLocalDatetimeValue(minutesFromNow(30));
+    if (/\b(1|one)\s*(hour|hr)\b/.test(lower)) return toLocalDatetimeValue(hoursFromNow(1));
+    if (/\b(2|two)\s*(hour|hr)\b/.test(lower)) return toLocalDatetimeValue(hoursFromNow(2));
+    if (/\btomorrow\b/.test(lower)) return toLocalDatetimeValue(tomorrowMorning());
+    if (/\bnext week\b/.test(lower)) return toLocalDatetimeValue(daysFromNow(7));
+    if (/\blater\b|\bfollow\b|\bcall back\b|\btext back\b|\bremind\b/.test(lower)) return toLocalDatetimeValue(hoursFromNow(2));
+    return "";
+  }
+
+  function appendNote(existing, note) {
+    const value = String(note || "").trim();
+    if (!value) return existing || "";
+    if (String(existing || "").includes(value)) return existing || "";
+    return [existing, value].filter(Boolean).join("\n");
+  }
+
+  function defaultTextQueueTemplate() {
+    return "Hi {{firstName}}, this is {{repName}} with {{businessName}}. I wanted to follow up and see if you still want me to check options for you. Reply STOP to opt out.";
+  }
+
+  function labelTextAudience(value) {
+    return {
+      due: "Due follow-up",
+      hot: "Hot lead",
+      appointments: "Appointment",
+      new: "New lead",
+      imported: "Imported text contact",
+      all: "Text OK customer"
+    }[value] || "Text queue";
+  }
+
+  function labelTextContactStage(stage) {
+    return {
+      "needs-review": "Review",
+      "follow-up": "Follow-up",
+      waiting: "Waiting",
+      linked: "Customer"
+    }[normalizeTextContactStage(stage)] || "Review";
+  }
+
+  function formatPhoneDisplay(phone) {
+    const digits = comparablePhone(phone);
+    if (digits.length !== 10) return phone || "";
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
 
   function renderLeads() {
     const query = el.searchInput.value.trim().toLowerCase();
@@ -2093,7 +2839,12 @@
 
   function isTextFile(file) {
     const name = file.name.toLowerCase();
-    return file.type.startsWith("text/") || name.endsWith(".txt") || name.endsWith(".csv") || name.endsWith(".md");
+    return file.type.startsWith("text/") || isXmlTextFile(file) || name.endsWith(".txt") || name.endsWith(".csv") || name.endsWith(".md");
+  }
+
+  function isXmlTextFile(file) {
+    const name = String(file.name || "").toLowerCase();
+    return name.endsWith(".xml") || file.type.includes("xml");
   }
 
   function parseLooseDateTime(value) {
@@ -2236,7 +2987,11 @@
       businessAddress: state.settings.businessAddress || ""
     };
 
-    return template.replace(/\{\{(\w+)\}\}/g, (_, key) => data[key] || "");
+    return applyTemplateTokens(template, data);
+  }
+
+  function applyTemplateTokens(template, data) {
+    return String(template || "").replace(/\{\{(\w+)\}\}/g, (_, key) => data[key] || "");
   }
 
   function logLabelForTemplate(templateKey, channel) {
@@ -2701,6 +3456,62 @@
       selectedDraftIndex: clampNumber(source.selectedDraftIndex, 0, 2, 0),
       posts: Array.isArray(source.posts) ? source.posts.map(normalizeMarketingPost) : []
     };
+  }
+
+  function normalizeTexting(texting) {
+    const source = texting && typeof texting === "object" ? texting : {};
+    const queueAudience = ["due", "hot", "appointments", "new", "imported", "all"].includes(source.queueAudience)
+      ? source.queueAudience
+      : textingDefaults.queueAudience;
+    const queue = Array.isArray(source.queue) ? source.queue.map(normalizeTextQueueItem).filter((item) => item.phone) : [];
+    const selectedQueueId = queue.some((item) => item.id === source.selectedQueueId) ? source.selectedQueueId : queue[0]?.id || "";
+    return {
+      ...clone(textingDefaults),
+      ...source,
+      importText: normalizeOcrText(source.importText || ""),
+      importedContacts: Array.isArray(source.importedContacts) ? source.importedContacts.map(normalizeTextContact).filter((contact) => contact.phone) : [],
+      queueAudience,
+      queueTemplate: String(source.queueTemplate || ""),
+      queue,
+      selectedQueueId,
+      lastImportAt: source.lastImportAt || ""
+    };
+  }
+
+  function normalizeTextContact(contact) {
+    const phone = contact?.phone || "";
+    return {
+      id: contact?.id || newId(),
+      name: String(contact?.name || "").trim(),
+      phone,
+      email: String(contact?.email || "").trim(),
+      snippet: normalizeOcrText(contact?.snippet || "").slice(0, 500),
+      conversation: normalizeOcrText(contact?.conversation || contact?.snippet || "").slice(0, 2200),
+      stage: normalizeTextContactStage(contact?.stage || (contact?.linkedLeadId ? "linked" : "needs-review")),
+      followUpAt: contact?.followUpAt || "",
+      lastAction: String(contact?.lastAction || ""),
+      lastActionAt: contact?.lastActionAt || "",
+      lastImportedAt: contact?.lastImportedAt || contact?.createdAt || "",
+      linkedLeadId: contact?.linkedLeadId || ""
+    };
+  }
+
+  function normalizeTextQueueItem(item) {
+    return {
+      id: item?.id || newId(),
+      leadId: item?.leadId || "",
+      contactId: item?.contactId || "",
+      name: String(item?.name || ""),
+      phone: String(item?.phone || ""),
+      message: String(item?.message || ""),
+      reason: String(item?.reason || ""),
+      status: item?.status === "opened" ? "opened" : "ready",
+      createdAt: item?.createdAt || new Date().toISOString()
+    };
+  }
+
+  function normalizeTextContactStage(stage) {
+    return ["needs-review", "follow-up", "waiting", "linked"].includes(stage) ? stage : "needs-review";
   }
 
   function normalizePromoSuggestions(promos) {

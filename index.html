@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#17324d" />
     <title>Lead Assistant</title>
-    <link rel="manifest" href="manifest.webmanifest?v=20" />
-    <link rel="stylesheet" href="styles.css?v=20" />
+    <link rel="manifest" href="manifest.webmanifest?v=21" />
+    <link rel="stylesheet" href="styles.css?v=21" />
   </head>
   <body>
     <header class="app-header">
@@ -264,6 +264,7 @@
         <nav class="tabs" aria-label="Views">
           <button class="tab-button active" data-view="dashboard" type="button">Today</button>
           <button class="tab-button" data-view="leads" type="button">Customers</button>
+          <button class="tab-button" data-view="texts" type="button">Texts</button>
           <button class="tab-button" data-view="quote" type="button">Quote</button>
           <button class="tab-button" data-view="marketing" type="button">Facebook</button>
           <button class="tab-button" data-view="pricing" type="button">Prices</button>
@@ -281,6 +282,7 @@
             <div class="home-actions">
               <button class="primary-button" id="openCaptureButton" type="button">New lead</button>
               <button class="secondary-button" data-jump-view="leads" type="button">Find customer</button>
+              <button class="secondary-button" data-jump-view="texts" type="button">Text queue</button>
               <button class="secondary-button" data-jump-view="quote" type="button">Quick quote</button>
               <button class="secondary-button" data-jump-view="marketing" type="button">Facebook post</button>
             </div>
@@ -358,6 +360,81 @@
             <button class="secondary-button" id="exportCsvButton" type="button">CSV</button>
           </div>
           <div class="lead-list" id="leadList"></div>
+        </section>
+
+        <section id="textsView" class="view">
+          <div class="section-block">
+            <div class="section-heading">
+              <div>
+                <h2>Text organizer</h2>
+                <p>Import copied text threads, find customer numbers, create leads, and work a reviewed text queue.</p>
+              </div>
+            </div>
+            <div class="marketing-stats" id="textingStats"></div>
+            <details class="form-section" open>
+              <summary>Import texts <small>Paste copied messages or shared text</small></summary>
+              <div class="section-fields">
+                <div class="ocr-panel">
+                  <div class="file-actions">
+                    <label class="file-button" for="textPhotoInput">Take photo</label>
+                    <label class="file-button" for="textFileInput">Upload screenshot</label>
+                  </div>
+                  <input id="textPhotoInput" type="file" accept="image/*" capture="environment" hidden />
+                  <input id="textFileInput" type="file" accept="image/*,.txt,.csv,.md,.xml" hidden />
+                  <img id="textOcrPreview" class="ocr-preview" alt="" hidden />
+                  <div class="ocr-status" id="textOcrStatus">Text import ready</div>
+                </div>
+                <textarea id="textImportText" rows="7" placeholder="Paste copied text messages here. Example: Mike Adams 336-555-7777 wants 1 Gig and 3 mobile lines tomorrow."></textarea>
+                <div class="button-row">
+                  <button class="primary-button" id="scanTextsButton" type="button">Scan texts</button>
+                  <button class="secondary-button" id="clearTextImportButton" type="button">Clear</button>
+                </div>
+                <p class="lead-meta">Phone browsers cannot read every SMS automatically. Use Android share, copy/paste, screenshots, or an SMS backup XML export to organize messages here.</p>
+              </div>
+            </details>
+            <div class="text-contact-list" id="textImportResults"></div>
+          </div>
+
+          <div class="section-block">
+            <details class="form-section" open>
+              <summary>Personal text queue <small>One reviewed SMS at a time</small></summary>
+              <div class="section-fields">
+                <div class="two-col">
+                  <div>
+                    <label for="textAudience">Audience</label>
+                    <select id="textAudience">
+                      <option value="due">Due follow-ups</option>
+                      <option value="hot">Hot leads</option>
+                      <option value="appointments">Appointments today/tomorrow</option>
+                      <option value="new">New leads</option>
+                      <option value="imported">Imported text contacts</option>
+                      <option value="all">All Text OK customers</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="textQueueTemplate">Message</label>
+                    <textarea id="textQueueTemplate" rows="4" placeholder="Hi {{firstName}}, this is {{repName}} with {{businessName}}. I wanted to follow up and see if you still want me to check options for you. Reply STOP to opt out."></textarea>
+                  </div>
+                </div>
+                <div class="button-row">
+                  <button class="primary-button" id="buildTextQueueButton" type="button">Build queue</button>
+                  <button class="secondary-button" id="openNextTextButton" type="button">Open next text</button>
+                  <button class="secondary-button" id="copySelectedTextButton" type="button">Copy selected</button>
+                </div>
+                <p class="lead-meta">Marketing texts only queue contacts marked Text OK. The app opens your SMS composer so every message is reviewed before sending.</p>
+              </div>
+            </details>
+            <div class="text-queue-list" id="textQueueList"></div>
+          </div>
+
+          <div class="section-block">
+            <details class="form-section">
+              <summary>Text contacts <small>Imported people and linked customers</small></summary>
+              <div class="section-fields">
+                <div class="text-contact-list" id="textContactList"></div>
+              </div>
+            </details>
+          </div>
         </section>
 
         <section id="quoteView" class="view">
@@ -643,7 +720,7 @@
     </main>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="vendor/tesseract.min.js?v=20"></script>
-    <script src="app.js?v=20"></script>
+    <script src="vendor/tesseract.min.js?v=21"></script>
+    <script src="app.js?v=21"></script>
   </body>
 </html>

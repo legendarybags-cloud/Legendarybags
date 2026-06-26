@@ -11,6 +11,9 @@ A local-first lead tracker for phone and internet sales follow-up.
 - Applies the $20 bundle discount when the quote has 1 Gig or higher internet plus Basic, Preferred, or Freedom mobile.
 - Opens your phone's native call, SMS, and email apps with templates already filled.
 - Tracks status, priority, next step, appointments, appointment status, contact log, due follow-ups, pricing, CSV export, and JSON backup.
+- Adds a Texts tab for Android share-to-app, pasted conversations, text screenshots, and SMS backup XML imports.
+- Groups imported text conversations by phone number, keeps a collapsible conversation snippet, finds unsaved contacts, and lets you create/update leads from them.
+- Sets quick text follow-ups on imported contacts, then carries those follow-ups into the saved customer record when linked.
 - Creates appointment reminder text/email drafts and downloadable calendar events.
 - Shows a Today Queue, daily closeout numbers, productivity stats, hot leads, due follow-ups, and upcoming appointments.
 - Opens to a cleaner Today command center with the lead capture form folded until you need it.
@@ -32,6 +35,12 @@ The app does not secretly scrape monday.com or your work system. Copy or photogr
 Use Take photo for the camera, or Upload file for a saved screenshot/image or TXT/CSV/MD file. The app will try to fill name, phone, email, address, source, best time, appointment, priority, mobile plan, line count, and internet speed.
 
 Best results come from a close, sharp, straight photo. If OCR misses anything, edit the OCR text or the fields before saving.
+
+## Text organizer
+
+The Texts tab is the Android-friendly way to feed the app customer conversations without giving it unsafe SMS access. You can share selected text into the installed app, paste copied messages, upload a screenshot for OCR, or import an SMS backup XML export. The app parses names, numbers, snippets, and likely follow-up timing, then keeps unsaved numbers in Text contacts until you create or link a lead.
+
+Android and browser PWAs cannot silently read the whole Messages database. A true automatic inbox scraper would require a separate native Android app with sensitive SMS/default-handler or notification-listener permissions. This version keeps the workflow local and reviewed: import what you choose, then use the queue to open one SMS draft at a time.
 
 ## Workflow tools
 
@@ -60,7 +69,7 @@ The app saves automatically on the phone and keeps a second local browser backup
 
 ## Compliance notes
 
-For SMS, use this only where the customer gave permission to be texted and honor STOP or any opt-out request. For commercial email, include accurate sender information, a valid mailing address, and an unsubscribe path. Ask your company for its approved templates and policy before using this with real customers.
+For SMS, use this only where the customer gave permission to be texted or where you are replying to an active customer conversation, and honor STOP or any opt-out request. For commercial email, include accurate sender information, a valid mailing address, and an unsubscribe path. Ask your company for its approved templates and policy before using this with real customers.
 
 ## Fully automatic sending
 
@@ -68,7 +77,7 @@ This browser version opens SMS and email drafts. Fully automatic sending needs a
 
 ## Phone app options
 
-The current version is a progressive web app. It can be installed from Chrome or Edge when opened from a supported secure page, and iPhone users can use Safari's Add to Home Screen. A true downloadable app with no site needs a native wrapper, Android APK, TestFlight/App Store, or company mobile-device management.
+The current version is a progressive web app. On Android, open the Cloudflare Pages URL in Chrome and install it from the browser menu; after install, Android can show Lead Assistant as a share target for selected text. iPhone users can use Safari's Add to Home Screen. A true downloadable app with no site needs a native wrapper, Android APK, TestFlight/App Store, or company mobile-device management.
 
 ## Easiest free hosting
 

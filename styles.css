@@ -771,7 +771,9 @@ button:focus-visible {
 }
 
 .generated-posts,
-.marketing-queue {
+.marketing-queue,
+.text-contact-list,
+.text-queue-list {
   display: grid;
   gap: 12px;
   margin-top: 14px;
@@ -819,6 +821,42 @@ button:focus-visible {
 .draft-card:has(input:checked) {
   border-color: var(--teal);
   box-shadow: 0 0 0 3px rgba(8, 125, 121, 0.12);
+}
+
+.text-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.text-card .lead-actions {
+  gap: 8px;
+}
+
+.text-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.text-card-actions button {
+  flex: 1 1 120px;
+}
+
+.text-queue-card textarea {
+  min-height: 116px;
+  background: #f8fafc;
+}
+
+.text-conversation {
+  background: #f8fafc;
+}
+
+.text-conversation .lead-note {
+  max-height: 220px;
+  overflow: auto;
 }
 
 .marketing-card {

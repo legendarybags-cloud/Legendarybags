@@ -6,6 +6,15 @@
   "scope": "./",
   "background_color": "#f4f7fa",
   "theme_color": "#17324d",
+  "share_target": {
+    "action": "./index.html",
+    "method": "GET",
+    "params": {
+      "title": "shareTitle",
+      "text": "shareText",
+      "url": "shareUrl"
+    }
+  },
   "icons": [
     {
       "src": "./icon.svg",
