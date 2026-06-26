@@ -86,6 +86,9 @@
     lastObjective: "address-check",
     monthlyPromo: "",
     monthlyPromoUpdatedAt: "",
+    promoSuggestions: [],
+    lastPromoFetchAt: "",
+    promoFetchError: "",
     groupsText: "",
     generatedDrafts: [],
     selectedDraftIndex: 0,
@@ -274,6 +277,9 @@
     saveMarketingPostButton: document.getElementById("saveMarketingPostButton"),
     copyMarketingDraftButton: document.getElementById("copyMarketingDraftButton"),
     saveMarketingPromoButton: document.getElementById("saveMarketingPromoButton"),
+    refreshMarketingPromosButton: document.getElementById("refreshMarketingPromosButton"),
+    marketingPromoStatus: document.getElementById("marketingPromoStatus"),
+    marketingPromoSuggestions: document.getElementById("marketingPromoSuggestions"),
     openBusinessSuiteButton: document.getElementById("openBusinessSuiteButton"),
     openMetaPlannerButton: document.getElementById("openMetaPlannerButton"),
     generatedPosts: document.getElementById("generatedPosts"),
@@ -328,6 +334,7 @@
     setupInstallSupport();
     requestPersistentStorage();
     restoreDurableStateIfNeeded();
+    maybeRefreshMarketingPromos();
     setInterval(checkReminderAlerts, 60000);
   }
 
@@ -523,6 +530,7 @@
     el.marketingForm.addEventListener("submit", saveMarketingPost);
     el.copyMarketingDraftButton.addEventListener("click", copySelectedMarketingDraft);
     el.saveMarketingPromoButton.addEventListener("click", saveMarketingPromo);
+    el.refreshMarketingPromosButton.addEventListener("click", () => refreshMarketingPromos({ applyTop: true }));
     el.openBusinessSuiteButton.addEventListener("click", openBusinessSuite);
     el.openMetaPlannerButton.addEventListener("click", openBusinessSuite);
     el.saveMarketingGroupsButton.addEventListener("click", saveMarketingGroups);
@@ -839,6 +847,7 @@
   function renderMarketing() {
     if (!el.marketingStats) return;
     renderMarketingStats();
+    renderMarketingPromoSuggestions();
     renderGeneratedMarketingDrafts();
     renderMarketingQueue();
     if (el.marketingGroupsText && el.marketingGroupsText.value !== state.marketing.groupsText) {
@@ -847,6 +856,36 @@
     if (el.marketingMonthlyPromo && el.marketingMonthlyPromo.value !== state.marketing.monthlyPromo) {
       el.marketingMonthlyPromo.value = state.marketing.monthlyPromo || "";
     }
+  }
+
+  function renderMarketingPromoSuggestions() {
+    if (!el.marketingPromoStatus || !el.marketingPromoSuggestions) return;
+    const suggestions = state.marketing.promoSuggestions || [];
+    const status = [];
+    if (state.marketing.lastPromoFetchAt) status.push(`Last checked ${formatDateTime(state.marketing.lastPromoFetchAt)}`);
+    if (state.marketing.promoFetchError) status.push(state.marketing.promoFetchError);
+    if (!status.length) status.push("Use refresh to check public Zirrus promo pages.");
+    el.marketingPromoStatus.textContent = status.join(" | ");
+    el.marketingPromoSuggestions.innerHTML = suggestions.length
+      ? suggestions
+          .slice(0, 5)
+          .map(
+            (promo, index) => `
+              <article class="promo-suggestion-card">
+                <div>
+                  <strong>${escapeHtml(promo.title || "Zirrus promo")}</strong>
+                  <p>${escapeHtml(promo.text)}</p>
+                  <small>${escapeHtml(sourceLabel(promo.source))}</small>
+                </div>
+                <button class="secondary-button" data-promo-index="${index}" type="button">Use</button>
+              </article>
+            `
+          )
+          .join("")
+      : "";
+    el.marketingPromoSuggestions.querySelectorAll("[data-promo-index]").forEach((button) => {
+      button.addEventListener("click", () => useMarketingPromoSuggestion(Number(button.dataset.promoIndex) || 0));
+    });
   }
 
   function renderMarketingStats() {
@@ -1031,6 +1070,74 @@
     saveState();
     renderMarketing();
     toast(state.marketing.monthlyPromo ? "Monthly promo saved." : "Monthly promo cleared.");
+  }
+
+  async function maybeRefreshMarketingPromos() {
+    if (!window.fetch || !navigator.onLine) return;
+    const lastFetch = dateValue(state.marketing.lastPromoFetchAt);
+    if (lastFetch && Date.now() - lastFetch < 24 * 60 * 60 * 1000) return;
+    await refreshMarketingPromos({ applyTop: !state.marketing.monthlyPromo, quiet: true });
+  }
+
+  async function refreshMarketingPromos(options = {}) {
+    const applyTop = Boolean(options.applyTop);
+    const quiet = Boolean(options.quiet);
+    if (!window.fetch) {
+      state.marketing.promoFetchError = "Promo refresh is not available in this browser.";
+      renderMarketing();
+      return;
+    }
+    state.marketing.promoFetchError = "";
+    if (el.refreshMarketingPromosButton) {
+      el.refreshMarketingPromosButton.disabled = true;
+      el.refreshMarketingPromosButton.textContent = "Checking Zirrus...";
+    }
+    renderMarketingPromoSuggestions();
+    try {
+      const response = await fetch(`/api/promos?ts=${Date.now()}`, { cache: "no-store" });
+      if (!response.ok) throw new Error(`Promo refresh failed: ${response.status}`);
+      const data = await response.json();
+      const suggestions = normalizePromoSuggestions(data.promos);
+      state.marketing.promoSuggestions = suggestions;
+      state.marketing.lastPromoFetchAt = data.updatedAt || new Date().toISOString();
+      if (!suggestions.length) throw new Error("No promo suggestions found");
+      if (applyTop) {
+        applyMarketingPromoSuggestion(suggestions[0]);
+        if (!quiet) generateMarketingDrafts();
+      }
+      saveState();
+      renderMarketing();
+      if (!quiet) toast(applyTop ? "Zirrus promo loaded." : "Zirrus promos refreshed.");
+    } catch (error) {
+      state.marketing.promoFetchError = "Could not refresh promos automatically. Paste the official Zirrus promo manually.";
+      saveState();
+      renderMarketing();
+      if (!quiet) toast("Promo refresh failed. Paste the promo manually.");
+    } finally {
+      if (el.refreshMarketingPromosButton) {
+        el.refreshMarketingPromosButton.disabled = false;
+        el.refreshMarketingPromosButton.textContent = "Refresh from Zirrus";
+      }
+    }
+  }
+
+  function useMarketingPromoSuggestion(index) {
+    const promo = (state.marketing.promoSuggestions || [])[index];
+    if (!promo) return;
+    applyMarketingPromoSuggestion(promo);
+    generateMarketingDrafts();
+    toast("Promo applied to drafts.");
+  }
+
+  function applyMarketingPromoSuggestion(promo) {
+    const text = cleanMarketingText(promo.text);
+    if (!text) return;
+    const objective = inferMarketingObjectiveFromPromo(text, promo.objective || state.marketing.lastObjective);
+    state.marketing.monthlyPromo = text;
+    state.marketing.monthlyPromoUpdatedAt = new Date().toISOString();
+    state.marketing.lastObjective = objective;
+    if (el.marketingMonthlyPromo) el.marketingMonthlyPromo.value = text;
+    if (el.marketingObjective) el.marketingObjective.value = objective;
   }
 
   function saveMarketingGroups() {
@@ -1238,6 +1345,16 @@
     if (/\b(fiber|internet|gig|mbps|speed)\b/.test(value)) return "fiber-speed";
     if (/\b(mobile|lines?|autopay|talk|text|data)\b/.test(value)) return "mobile-autopay";
     return normalizeMarketingObjective(fallbackObjective);
+  }
+
+  function sourceLabel(source) {
+    const value = String(source || "");
+    if (!value) return "Public Zirrus source";
+    if (value.includes("/pages/discounts")) return "Zirrus discounts page";
+    if (value.includes("/pages/mobile-plans")) return "Zirrus mobile plans page";
+    if (value.includes("/pages/fiber-internet")) return "Zirrus fiber internet page";
+    if (value.includes("zirrus.com")) return "Zirrus website";
+    return value;
   }
 
   function openBusinessSuite() {
@@ -2423,10 +2540,31 @@
       lastObjective: normalizeMarketingObjective(source.lastObjective || source.generatedDrafts?.[0]?.objective || source.posts?.[0]?.objective || "address-check"),
       monthlyPromo: cleanMarketingText(source.monthlyPromo || ""),
       monthlyPromoUpdatedAt: source.monthlyPromoUpdatedAt || "",
+      promoSuggestions: normalizePromoSuggestions(source.promoSuggestions),
+      lastPromoFetchAt: source.lastPromoFetchAt || "",
+      promoFetchError: source.promoFetchError || "",
       generatedDrafts: Array.isArray(source.generatedDrafts) ? source.generatedDrafts.map(normalizeMarketingDraft) : [],
       selectedDraftIndex: clampNumber(source.selectedDraftIndex, 0, 2, 0),
       posts: Array.isArray(source.posts) ? source.posts.map(normalizeMarketingPost) : []
     };
+  }
+
+  function normalizePromoSuggestions(promos) {
+    if (!Array.isArray(promos)) return [];
+    const seen = new Set();
+    return promos
+      .map((promo) => ({
+        title: cleanMarketingText(promo?.title || "Zirrus promo"),
+        text: cleanMarketingText(promo?.text || ""),
+        source: cleanMarketingText(promo?.source || ""),
+        objective: normalizeMarketingObjective(promo?.objective || "")
+      }))
+      .filter((promo) => {
+        if (!promo.text || seen.has(promo.text.toLowerCase())) return false;
+        seen.add(promo.text.toLowerCase());
+        return true;
+      })
+      .slice(0, 8);
   }
 
   function normalizeMarketingDraft(draft) {

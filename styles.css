@@ -719,6 +719,48 @@ button:focus-visible {
   background: #fff;
 }
 
+.promo-source-status {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin: 8px 0 0;
+}
+
+.promo-suggestions {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.promo-suggestion-card {
+  align-items: start;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 10px;
+}
+
+.promo-suggestion-card strong,
+.promo-suggestion-card small {
+  display: block;
+}
+
+.promo-suggestion-card p {
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  margin: 4px 0;
+}
+
+.promo-suggestion-card small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .generated-posts,
 .marketing-queue {
   display: grid;
