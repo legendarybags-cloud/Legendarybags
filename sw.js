@@ -1,4 +1,4 @@
-const CACHE_NAME = "lead-assistant-v19";
+const CACHE_NAME = "lead-assistant-v20";
 const ASSETS = [
   "./",
   "./index.html",

@@ -281,6 +281,12 @@
     refreshMarketingPromosButton: document.getElementById("refreshMarketingPromosButton"),
     marketingPromoStatus: document.getElementById("marketingPromoStatus"),
     marketingPromoSuggestions: document.getElementById("marketingPromoSuggestions"),
+    connectMetaButton: document.getElementById("connectMetaButton"),
+    refreshMetaStatusButton: document.getElementById("refreshMetaStatusButton"),
+    postSelectedToMetaButton: document.getElementById("postSelectedToMetaButton"),
+    disconnectMetaButton: document.getElementById("disconnectMetaButton"),
+    metaConnectionStatus: document.getElementById("metaConnectionStatus"),
+    metaConnectionPill: document.getElementById("metaConnectionPill"),
     openBusinessSuiteButton: document.getElementById("openBusinessSuiteButton"),
     openMetaPlannerButton: document.getElementById("openMetaPlannerButton"),
     generatedPosts: document.getElementById("generatedPosts"),
@@ -323,6 +329,14 @@
     toast: document.getElementById("toast")
   };
 
+  let metaConnection = {
+    configured: false,
+    connected: false,
+    loading: true,
+    pageName: "",
+    message: "Checking Facebook Page connection..."
+  };
+
   init();
 
   function init() {
@@ -332,6 +346,8 @@
     renderQuoteSummaries();
     renderAll();
     wireEvents();
+    handleMetaReturn();
+    loadMetaConnectionStatus({ quiet: true });
     setupInstallSupport();
     requestPersistentStorage();
     restoreDurableStateIfNeeded();
@@ -532,6 +548,10 @@
     el.copyMarketingDraftButton.addEventListener("click", copySelectedMarketingDraft);
     el.saveMarketingPromoButton.addEventListener("click", saveMarketingPromo);
     el.refreshMarketingPromosButton.addEventListener("click", () => refreshMarketingPromos({ applyTop: true }));
+    el.connectMetaButton.addEventListener("click", connectMetaPage);
+    el.refreshMetaStatusButton.addEventListener("click", () => loadMetaConnectionStatus({ quiet: false }));
+    el.postSelectedToMetaButton.addEventListener("click", postSelectedDraftToMeta);
+    el.disconnectMetaButton.addEventListener("click", disconnectMetaPage);
     el.openBusinessSuiteButton.addEventListener("click", openBusinessSuite);
     el.openMetaPlannerButton.addEventListener("click", openBusinessSuite);
     el.saveMarketingGroupsButton.addEventListener("click", saveMarketingGroups);
@@ -848,6 +868,7 @@
   function renderMarketing() {
     if (!el.marketingStats) return;
     renderMarketingStats();
+    renderMetaConnection();
     renderMarketingPromoSuggestions();
     renderGeneratedMarketingDrafts();
     renderMarketingQueue();
@@ -857,6 +878,25 @@
     if (el.marketingMonthlyPromo && el.marketingMonthlyPromo.value !== state.marketing.monthlyPromo) {
       el.marketingMonthlyPromo.value = state.marketing.monthlyPromo || "";
     }
+  }
+
+  function renderMetaConnection() {
+    if (!el.metaConnectionStatus || !el.metaConnectionPill) return;
+    const configured = Boolean(metaConnection.configured);
+    const connected = Boolean(metaConnection.connected);
+    const pageName = metaConnection.pageName || "your Facebook Page";
+    const status = metaConnection.loading
+      ? "Checking Facebook Page connection..."
+      : connected
+        ? `Connected to ${pageName}. You can post the selected draft to your Page.`
+        : metaConnection.message || (configured ? "Ready to connect your Facebook Page." : "Meta app is not configured in Cloudflare yet.");
+    el.metaConnectionStatus.textContent = status;
+    el.metaConnectionPill.textContent = connected ? "Connected" : configured ? "Ready" : "Setup needed";
+    el.metaConnectionPill.className = `pill ${connected ? "closed" : configured ? "" : "warning"}`;
+    if (el.connectMetaButton) el.connectMetaButton.disabled = !configured || connected || metaConnection.loading;
+    if (el.refreshMetaStatusButton) el.refreshMetaStatusButton.disabled = metaConnection.loading;
+    if (el.postSelectedToMetaButton) el.postSelectedToMetaButton.disabled = !connected || metaConnection.loading;
+    if (el.disconnectMetaButton) el.disconnectMetaButton.disabled = !connected || metaConnection.loading;
   }
 
   function renderMarketingPromoSuggestions() {
@@ -1068,6 +1108,98 @@
       return;
     }
     copyText(draft.text);
+  }
+
+  function handleMetaReturn() {
+    const params = new URLSearchParams(window.location.search);
+    const facebook = params.get("facebook");
+    if (!facebook) return;
+    switchView("marketing");
+    if (facebook === "connected") toast("Facebook Page connected.");
+    if (facebook === "error") toast("Facebook connection failed.");
+    params.delete("facebook");
+    const query = params.toString();
+    const cleanUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
+    window.history.replaceState({}, document.title, cleanUrl);
+  }
+
+  function connectMetaPage() {
+    window.location.href = "/api/meta/login";
+  }
+
+  async function loadMetaConnectionStatus(options = {}) {
+    const quiet = Boolean(options.quiet);
+    metaConnection = { ...metaConnection, loading: true };
+    renderMetaConnection();
+    try {
+      const data = await fetchJson("/api/meta/status");
+      metaConnection = {
+        configured: Boolean(data.configured),
+        connected: Boolean(data.connected),
+        loading: false,
+        pageName: data.page?.name || "",
+        message: data.message || ""
+      };
+      renderMetaConnection();
+      if (!quiet && metaConnection.connected) toast("Facebook Page connection checked.");
+      if (!quiet && !metaConnection.connected) toast(metaConnection.configured ? "Connect your Facebook Page." : "Add Meta settings in Cloudflare first.");
+    } catch (error) {
+      metaConnection = {
+        configured: false,
+        connected: false,
+        loading: false,
+        pageName: "",
+        message: "Could not check Facebook connection."
+      };
+      renderMetaConnection();
+      if (!quiet) toast("Could not check Facebook connection.");
+    }
+  }
+
+  async function postSelectedDraftToMeta() {
+    const draft = selectedMarketingDraft();
+    if (!draft) {
+      toast("Generate a draft first.");
+      return;
+    }
+    const pageName = metaConnection.pageName || "your Facebook Page";
+    const ok = confirm(`Post the selected draft to ${pageName}?`);
+    if (!ok) return;
+    el.postSelectedToMetaButton.disabled = true;
+    el.postSelectedToMetaButton.textContent = "Posting...";
+    try {
+      const result = await fetchJson("/api/meta/post", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: draft.text })
+      });
+      toast(result.postId ? "Posted to Facebook Page." : "Facebook post request completed.");
+    } catch (error) {
+      toast(error.message || "Facebook post failed.");
+      loadMetaConnectionStatus({ quiet: true });
+    } finally {
+      el.postSelectedToMetaButton.textContent = "Post selected to Page";
+      renderMetaConnection();
+    }
+  }
+
+  async function disconnectMetaPage() {
+    const ok = confirm("Disconnect this Facebook Page from Lead Assistant?");
+    if (!ok) return;
+    try {
+      await fetchJson("/api/meta/disconnect", { method: "POST" });
+      metaConnection = {
+        configured: metaConnection.configured,
+        connected: false,
+        loading: false,
+        pageName: "",
+        message: "Facebook Page disconnected."
+      };
+      renderMetaConnection();
+      toast("Facebook Page disconnected.");
+    } catch (error) {
+      toast("Could not disconnect Facebook Page.");
+    }
   }
 
   function saveMarketingPromo() {
@@ -3198,6 +3330,23 @@
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+  }
+
+  async function fetchJson(url, options = {}) {
+    const response = await fetch(url, options);
+    const text = await response.text();
+    let data = {};
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch (error) {
+        data = { message: text };
+      }
+    }
+    if (!response.ok) {
+      throw new Error(data.error || data.message || `Request failed: ${response.status}`);
+    }
+    return data;
   }
 
   function icsDate(date) {

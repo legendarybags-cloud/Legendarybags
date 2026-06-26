@@ -703,12 +703,21 @@ button:focus-visible {
   margin-top: 14px;
 }
 
+.meta-connect-card,
 .monthly-promo {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #f8fbfd;
   margin-top: 12px;
   padding: 12px;
+}
+
+.meta-connect-card .button-row {
+  margin-top: 10px;
+}
+
+.meta-connect-card .lead-name {
+  font-size: 1rem;
 }
 
 .monthly-promo label {

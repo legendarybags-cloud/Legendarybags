@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#17324d" />
     <title>Lead Assistant</title>
-    <link rel="manifest" href="manifest.webmanifest?v=19" />
-    <link rel="stylesheet" href="styles.css?v=19" />
+    <link rel="manifest" href="manifest.webmanifest?v=20" />
+    <link rel="stylesheet" href="styles.css?v=20" />
   </head>
   <body>
     <header class="app-header">
@@ -416,6 +416,22 @@
 
             <div class="marketing-stats" id="marketingStats"></div>
             <div class="pricing-note">Campaign presets stay close to Zirrus public offers: address checks, fiber speed, Smart Wi-Fi 6, mobile AutoPay, iPhone trade-in promos, business service, and the eligible $20 bundle discount.</div>
+            <div class="meta-connect-card">
+              <div class="lead-topline">
+                <div>
+                  <h3 class="lead-name">Facebook Page connection</h3>
+                  <p class="lead-meta" id="metaConnectionStatus">Checking Facebook Page connection...</p>
+                </div>
+                <span class="pill" id="metaConnectionPill">Not connected</span>
+              </div>
+              <div class="button-row">
+                <button class="secondary-button" id="connectMetaButton" type="button">Connect Page</button>
+                <button class="secondary-button" id="refreshMetaStatusButton" type="button">Check</button>
+                <button class="primary-button" id="postSelectedToMetaButton" type="button">Post selected to Page</button>
+                <button class="secondary-button" id="disconnectMetaButton" type="button">Disconnect</button>
+              </div>
+              <p class="lead-meta">Facebook posting uses Cloudflare server routes. Page tokens are not saved in the phone app.</p>
+            </div>
             <div class="monthly-promo">
               <label for="marketingMonthlyPromo">Monthly Zirrus promo</label>
               <textarea id="marketingMonthlyPromo" rows="4" placeholder="Paste the current Zirrus Facebook/Instagram promo here. Example: Bundle with Mobile and get $28/mo per line, plus 3 free months of 1 Gig Fiber Internet."></textarea>
@@ -627,7 +643,7 @@
     </main>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="vendor/tesseract.min.js?v=19"></script>
-    <script src="app.js?v=19"></script>
+    <script src="vendor/tesseract.min.js?v=20"></script>
+    <script src="app.js?v=20"></script>
   </body>
 </html>

@@ -48,6 +48,8 @@ The Marketing tab generates three local post drafts from Zirrus-style campaign p
 
 Cloudflare Pages serves `/api/promos`, which reads public Zirrus pages and returns normalized promo suggestions. Facebook and Instagram can block automated reads; social-only promo automation needs Meta's official Pages/Instagram APIs and approved account access, so manual paste remains the fallback until that connection exists.
 
+The Facebook Page connection uses Cloudflare Functions under `/api/meta/*`. Add these Cloudflare Pages environment variables before connecting a Page: `META_APP_ID`, `META_APP_SECRET`, and `META_COOKIE_SECRET`. Optional: `META_GRAPH_VERSION` and `META_REDIRECT_URI`. In the Meta app, add this OAuth redirect URI: `https://legendarybags.pages.dev/api/meta/callback`. The frontend never stores the Page access token; it is encrypted in an HttpOnly cookie by Cloudflare.
+
 Save the best draft to the posting queue, copy it into your Facebook Business Page or approved local groups, then mark it posted and track responses/leads.
 
 This app does not auto-post into Facebook groups. For approved automation later, use Meta Business Suite for scheduling or a backend connected to the official Meta Pages API after your app has the required Page permissions and review.
