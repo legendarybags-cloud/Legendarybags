@@ -17,7 +17,7 @@ A local-first lead tracker for phone and internet sales follow-up.
 - Uses collapsible mobile sections so customer info, quote, workflow, follow-up, and notes do not all compete on one screen.
 - Keeps lead cards compact by showing the main contact buttons first and putting extra actions, notes, and activity behind expanders.
 - Warns about possible duplicates by matching phone or email.
-- Adds a Facebook Marketing tab for Zirrus-aligned campaign drafts, local group/manual posting plans, a posting queue, response tracking, lead counters, and Meta Business Suite shortcuts.
+- Adds a Facebook Marketing tab for Zirrus-aligned campaign drafts, monthly promo rewrites, local group/manual posting plans, a posting queue, response tracking, lead counters, and Meta Business Suite shortcuts.
 - Saves data automatically in the browser, mirrors it to a second on-phone storage area, and shows last-saved/backup status on the Today screen.
 - Keeps data local unless you export it or add a secure sync backend later.
 
@@ -44,7 +44,7 @@ Best results come from a close, sharp, straight photo. If OCR misses anything, e
 
 ## Facebook marketing
 
-The Marketing tab generates three local post drafts from Zirrus-style campaign presets: address availability, fiber speed, Smart Wi-Fi 6, internet plus mobile bundle savings, mobile AutoPay savings, iPhone/trade-in offers, local service, and business internet/phone. The default contact is Nick Williams at `336-986-6691` and `nick.williams@zirrus.com`, so drafts steer people to contact him directly instead of sending them to the site.
+The Marketing tab generates three local post drafts from Zirrus-style campaign presets: address availability, fiber speed, Smart Wi-Fi 6, internet plus mobile bundle savings, mobile AutoPay savings, iPhone/trade-in offers, local service, and business internet/phone. Paste the current monthly Zirrus Facebook or Instagram promo into the Monthly Zirrus promo box, then generate drafts that quote that offer in a more natural local voice. The default contact is Nick Williams at `336-986-6691` and `nick.williams@zirrus.com`, so drafts steer people to contact him directly instead of sending them to the site.
 
 Save the best draft to the posting queue, copy it into your Facebook Business Page or approved local groups, then mark it posted and track responses/leads.
 

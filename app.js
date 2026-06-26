@@ -84,6 +84,8 @@
     pageUrl: "",
     defaultArea: "",
     lastObjective: "address-check",
+    monthlyPromo: "",
+    monthlyPromoUpdatedAt: "",
     groupsText: "",
     generatedDrafts: [],
     selectedDraftIndex: 0,
@@ -265,11 +267,13 @@
     marketingChannel: document.getElementById("marketingChannel"),
     marketingOffer: document.getElementById("marketingOffer"),
     marketingHook: document.getElementById("marketingHook"),
+    marketingMonthlyPromo: document.getElementById("marketingMonthlyPromo"),
     marketingPostDate: document.getElementById("marketingPostDate"),
     marketingPageUrl: document.getElementById("marketingPageUrl"),
     generateMarketingButton: document.getElementById("generateMarketingButton"),
     saveMarketingPostButton: document.getElementById("saveMarketingPostButton"),
     copyMarketingDraftButton: document.getElementById("copyMarketingDraftButton"),
+    saveMarketingPromoButton: document.getElementById("saveMarketingPromoButton"),
     openBusinessSuiteButton: document.getElementById("openBusinessSuiteButton"),
     openMetaPlannerButton: document.getElementById("openMetaPlannerButton"),
     generatedPosts: document.getElementById("generatedPosts"),
@@ -518,6 +522,7 @@
     el.generateMarketingButton.addEventListener("click", generateMarketingDrafts);
     el.marketingForm.addEventListener("submit", saveMarketingPost);
     el.copyMarketingDraftButton.addEventListener("click", copySelectedMarketingDraft);
+    el.saveMarketingPromoButton.addEventListener("click", saveMarketingPromo);
     el.openBusinessSuiteButton.addEventListener("click", openBusinessSuite);
     el.openMetaPlannerButton.addEventListener("click", openBusinessSuite);
     el.saveMarketingGroupsButton.addEventListener("click", saveMarketingGroups);
@@ -638,6 +643,7 @@
       );
     }
     if (el.marketingAudience) el.marketingAudience.value = state.marketing.defaultArea || "";
+    if (el.marketingMonthlyPromo) el.marketingMonthlyPromo.value = state.marketing.monthlyPromo || "";
     if (el.marketingPageUrl) el.marketingPageUrl.value = state.marketing.pageUrl || "";
     if (el.marketingPostDate && !el.marketingPostDate.value) el.marketingPostDate.value = toLocalDatetimeValue(tomorrowMarketingTime());
     if (el.marketingGroupsText) el.marketingGroupsText.value = state.marketing.groupsText || "";
@@ -838,6 +844,9 @@
     if (el.marketingGroupsText && el.marketingGroupsText.value !== state.marketing.groupsText) {
       el.marketingGroupsText.value = state.marketing.groupsText || "";
     }
+    if (el.marketingMonthlyPromo && el.marketingMonthlyPromo.value !== state.marketing.monthlyPromo) {
+      el.marketingMonthlyPromo.value = state.marketing.monthlyPromo || "";
+    }
   }
 
   function renderMarketingStats() {
@@ -947,8 +956,11 @@
     state.marketing.defaultArea = brief.audience;
     state.marketing.pageUrl = brief.pageUrl;
     state.marketing.lastObjective = brief.objective;
+    state.marketing.monthlyPromo = brief.monthlyPromo;
+    state.marketing.monthlyPromoUpdatedAt = brief.monthlyPromo ? new Date().toISOString() : state.marketing.monthlyPromoUpdatedAt || "";
     state.marketing.generatedDrafts = buildMarketingDrafts(brief);
     state.marketing.selectedDraftIndex = 0;
+    el.marketingObjective.value = brief.objective;
     saveState();
     renderMarketing();
     toast("Marketing drafts generated.");
@@ -961,7 +973,11 @@
       generateMarketingDrafts();
     }
     let draft = selectedMarketingDraft();
-    if (draft && draft.objective && normalizeMarketingObjective(draft.objective) !== brief.objective) {
+    if (
+      draft &&
+      (draft.objective && normalizeMarketingObjective(draft.objective) !== brief.objective ||
+        cleanMarketingText(draft.monthlyPromo) !== brief.monthlyPromo)
+    ) {
       state.marketing.generatedDrafts = buildMarketingDrafts(brief);
       state.marketing.selectedDraftIndex = 0;
       draft = selectedMarketingDraft();
@@ -983,6 +999,7 @@
       audience: brief.audience,
       offer: brief.offer,
       hook: brief.hook,
+      monthlyPromo: brief.monthlyPromo,
       text: draft.text,
       responses: 0,
       leads: 0
@@ -990,6 +1007,9 @@
     state.marketing.pageUrl = brief.pageUrl;
     state.marketing.defaultArea = brief.audience;
     state.marketing.lastObjective = brief.objective;
+    state.marketing.monthlyPromo = brief.monthlyPromo;
+    state.marketing.monthlyPromoUpdatedAt = brief.monthlyPromo ? new Date().toISOString() : state.marketing.monthlyPromoUpdatedAt || "";
+    el.marketingObjective.value = brief.objective;
     state.marketing.posts.unshift(post);
     saveState();
     renderMarketing();
@@ -1003,6 +1023,14 @@
       return;
     }
     copyText(draft.text);
+  }
+
+  function saveMarketingPromo() {
+    state.marketing.monthlyPromo = cleanMarketingText(el.marketingMonthlyPromo.value);
+    state.marketing.monthlyPromoUpdatedAt = state.marketing.monthlyPromo ? new Date().toISOString() : "";
+    saveState();
+    renderMarketing();
+    toast(state.marketing.monthlyPromo ? "Monthly promo saved." : "Monthly promo cleared.");
   }
 
   function saveMarketingGroups() {
@@ -1068,14 +1096,18 @@
   }
 
   function readMarketingBrief() {
-    const objective = normalizeMarketingObjective(el.marketingObjective.value);
+    const monthlyPromo = cleanMarketingText(el.marketingMonthlyPromo.value || state.marketing.monthlyPromo || "");
+    const selectedObjective = normalizeMarketingObjective(el.marketingObjective.value);
+    const objective = monthlyPromo ? inferMarketingObjectiveFromPromo(monthlyPromo, selectedObjective) : selectedObjective;
+    const customHook = el.marketingHook.value.trim();
     return {
       objective,
       tone: el.marketingTone.value,
       audience: el.marketingAudience.value.trim() || "our local area",
       channel: el.marketingChannel.value,
       offer: el.marketingOffer.value.trim() || defaultMarketingOffer(objective),
-      hook: el.marketingHook.value.trim() || defaultMarketingHook(objective),
+      hook: customHook || (monthlyPromo ? defaultMonthlyPromoHook(objective) : defaultMarketingHook(objective)),
+      monthlyPromo,
       postDate: el.marketingPostDate.value,
       pageUrl: el.marketingPageUrl.value.trim()
     };
@@ -1094,38 +1126,58 @@
     const area = brief.audience || "our local area";
     const offer = brief.offer || campaign.offer;
     const hook = brief.hook || campaign.hook;
+    const monthlyPromo = cleanMarketingText(brief.monthlyPromo);
+    const promoLine = monthlyPromo || offer;
+    const promoIntro = monthlyPromo
+      ? `Zirrus promo I am quoting this month: ${promoLine}`
+      : `This month's focus: ${promoLine}`;
+    const promoLineSentence = marketingSentence(promoLine);
+    const promoIntroSentence = marketingSentence(promoIntro);
     const cta = marketingCta(brief.channel, { rep, phone, email });
     const tags = campaign.tags || "#Zirrus #FiberInternet #MobilePlans";
     const disclosure = campaign.disclosure || "Availability and pricing can vary. Message me for a quick check.";
 
     const openings = {
-      neighbor: `Neighbors in ${area},`,
-      direct: `${area}: quick ${business} update.`,
-      helpful: `If you are comparing internet or phone options in ${area},`,
-      urgent: `${area}, I am checking ${business} options this week.`
+      neighbor: `Quick heads up for ${area}:`,
+      direct: `${area}, I am quoting this ${business} promo this week.`,
+      helpful: `If you have been meaning to compare internet or mobile in ${area},`,
+      urgent: `I am making my ${business} promo check list for ${area} this week.`
     };
     const opener = openings[brief.tone] || openings.neighbor;
 
     return [
       {
         objective: brief.objective,
-        title: "Local helper",
-        angle: `${campaign.label} | best for community-style posts`,
-        text: `${opener} I can help you check ${business} options without sending you in circles.\n\n${hook}\n\nCurrent focus: ${offer}.\n\nMessage me privately with your service address or what you want priced and I will check the best next step.\n\n${cta}\n\n${disclosure}\n${tags}`
+        monthlyPromo,
+        title: "Friendly local",
+        angle: `${campaign.label} | sounds like a real local post`,
+        text: `${opener}\n\n${promoIntroSentence}\n\n${hook}\n\nIf you want me to see if it fits your home or phone setup, send me your address and what you have now. I will price it out and tell you what actually makes sense.\n\n${cta}\n\n${disclosure}\n${tags}`
       },
       {
         objective: brief.objective,
-        title: "Offer first",
-        angle: "Best when you want direct leads",
-        text: `Looking for a better internet or phone setup in ${area}?\n\nI am helping local customers compare ${business} options, including ${offer}.\n\nSend me:\n1. Your service address\n2. What you have now\n3. Internet speed or number of mobile lines needed\n\nI will check availability, pricing, and the best next step.\n\n${cta}\n\n${disclosure}`
+        monthlyPromo,
+        title: "Simple offer",
+        angle: "Best when you want people to message you",
+        text: `Keeping this simple for ${area}:\n\n${promoLineSentence}\n\nIf your internet bill or phone bill has been creeping up, it may be worth a quick check. I can look at availability, bundle options, setup details, and the real monthly number before you make any decision.\n\n${cta}\n\n${disclosure}`
       },
       {
         objective: brief.objective,
-        title: "Question post",
-        angle: "Best for comments and engagement",
-        text: `${area} question: ${campaign.question}\n\nI can help check:\n1. ${campaign.proof}\n2. Monthly package pricing\n3. Bundle or phone options if they fit\n4. The easiest setup path\n\nI work with ${business}. ${cta}\n\n${disclosure}`
+        monthlyPromo,
+        title: "Comment starter",
+        angle: "Best for comments and quick replies",
+        text: `${area}, want me to check this for you?\n\n${promoLineSentence}\n\nI can check the address, compare the package, and let you know whether the promo fits. No pressure if it does not make sense for you.\n\n${cta}\n\n${disclosure}`
       }
     ];
+  }
+
+  function cleanMarketingText(text) {
+    return String(text || "").replace(/\s+/g, " ").trim();
+  }
+
+  function marketingSentence(text) {
+    const value = cleanMarketingText(text);
+    if (!value) return "";
+    return /[.!?]$/.test(value) ? value : `${value}.`;
   }
 
   function defaultMarketingOffer(objective) {
@@ -1136,6 +1188,14 @@
     return getMarketingCampaign(objective).hook;
   }
 
+  function defaultMonthlyPromoHook(objective) {
+    const campaign = getMarketingCampaign(objective);
+    if (objective === "bundle") return "I can check the address, mobile lines, bundle fit, and what the monthly total would actually look like.";
+    if (campaign.interest === "internet") return "I can check what speeds are available at the address and help compare the monthly options.";
+    if (campaign.interest === "mobile") return "I can check line count, phone options, eligibility, and what the monthly number would look like.";
+    return "I can check whether the promo fits your home, phone lines, or business setup before you decide.";
+  }
+
   function marketingCta(channel, contact) {
     const details = typeof contact === "string"
       ? { rep: contactDefaults.repName, phone: contact, email: contactDefaults.replyEmail }
@@ -1143,9 +1203,9 @@
     const rep = details.rep || contactDefaults.repName;
     const phone = details.phone || contactDefaults.replyPhone;
     const email = details.email || contactDefaults.replyEmail;
-    if (channel === "ad") return `Submit the form or contact ${rep} directly at ${phone} or ${email}.`;
-    if (channel === "story") return `Reply CHECK, call/text ${phone}, or email ${email}.`;
-    return `Comment CHECK, message me here, call/text ${phone}, or email ${email}.`;
+    if (channel === "ad") return `Use the form, or reach ${rep} directly at ${phone} or ${email}.`;
+    if (channel === "story") return `Reply CHECK or text ${phone} and I will check it for you. Email works too: ${email}.`;
+    return `Comment CHECK, message me here, or call/text ${phone}. Email works too: ${email}.`;
   }
 
   function prefillLeadFromMarketing(post) {
@@ -1166,6 +1226,18 @@
 
   function normalizeMarketingObjective(objective) {
     return legacyMarketingObjectives[objective] || (marketingCampaigns[objective] ? objective : "address-check");
+  }
+
+  function inferMarketingObjectiveFromPromo(text, fallbackObjective) {
+    const value = cleanMarketingText(text).toLowerCase();
+    if (!value) return normalizeMarketingObjective(fallbackObjective);
+    if (/\b(business|commercial|office|shop)\b/.test(value)) return "business";
+    if (/\b(iphone|trade[- ]?in|device|phone upgrade|bill credit|bill-credit)\b/.test(value)) return "iphone-trade";
+    if (/\b(bundle|mobile and|get.*line|per line|1 gig|2 gig|3 gig|free months?)\b/.test(value) && /\b(mobile|line|phone|internet|gig)\b/.test(value)) return "bundle";
+    if (/\b(wi[- ]?fi|wifi|smart wi[- ]?fi)\b/.test(value)) return "smart-wifi";
+    if (/\b(fiber|internet|gig|mbps|speed)\b/.test(value)) return "fiber-speed";
+    if (/\b(mobile|lines?|autopay|talk|text|data)\b/.test(value)) return "mobile-autopay";
+    return normalizeMarketingObjective(fallbackObjective);
   }
 
   function openBusinessSuite() {
@@ -2349,6 +2421,8 @@
       ...clone(marketingDefaults),
       ...source,
       lastObjective: normalizeMarketingObjective(source.lastObjective || source.generatedDrafts?.[0]?.objective || source.posts?.[0]?.objective || "address-check"),
+      monthlyPromo: cleanMarketingText(source.monthlyPromo || ""),
+      monthlyPromoUpdatedAt: source.monthlyPromoUpdatedAt || "",
       generatedDrafts: Array.isArray(source.generatedDrafts) ? source.generatedDrafts.map(normalizeMarketingDraft) : [],
       selectedDraftIndex: clampNumber(source.selectedDraftIndex, 0, 2, 0),
       posts: Array.isArray(source.posts) ? source.posts.map(normalizeMarketingPost) : []
@@ -2358,6 +2432,7 @@
   function normalizeMarketingDraft(draft) {
     return {
       objective: draft?.objective ? normalizeMarketingObjective(draft.objective) : "",
+      monthlyPromo: cleanMarketingText(draft?.monthlyPromo || ""),
       title: draft?.title || "Draft",
       angle: draft?.angle || "",
       text: draft?.text || ""
@@ -2378,6 +2453,7 @@
       audience: post.audience || "",
       offer: post.offer || "",
       hook: post.hook || "",
+      monthlyPromo: cleanMarketingText(post.monthlyPromo || ""),
       text: post.text || "",
       responses: clampNumber(post.responses, 0, 9999, 0),
       leads: clampNumber(post.leads, 0, 9999, 0)

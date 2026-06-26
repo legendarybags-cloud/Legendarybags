@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#17324d" />
     <title>Lead Assistant</title>
-    <link rel="manifest" href="manifest.webmanifest?v=16" />
-    <link rel="stylesheet" href="styles.css?v=16" />
+    <link rel="manifest" href="manifest.webmanifest?v=17" />
+    <link rel="stylesheet" href="styles.css?v=17" />
   </head>
   <body>
     <header class="app-header">
@@ -416,6 +416,14 @@
 
             <div class="marketing-stats" id="marketingStats"></div>
             <div class="pricing-note">Campaign presets stay close to Zirrus public offers: address checks, fiber speed, Smart Wi-Fi 6, mobile AutoPay, iPhone trade-in promos, business service, and the eligible $20 bundle discount.</div>
+            <div class="monthly-promo">
+              <label for="marketingMonthlyPromo">Monthly Zirrus promo</label>
+              <textarea id="marketingMonthlyPromo" rows="4" placeholder="Paste the current Zirrus Facebook/Instagram promo here. Example: Bundle with Mobile and get $28/mo per line, plus 3 free months of 1 Gig Fiber Internet."></textarea>
+              <div class="button-row">
+                <button class="secondary-button" id="saveMarketingPromoButton" type="button">Save monthly promo</button>
+              </div>
+              <p class="lead-meta">Use the official Zirrus wording as the offer source. The drafts will rewrite it in your voice and send replies to you.</p>
+            </div>
 
             <form id="marketingForm" class="marketing-form">
               <div class="two-col">
@@ -616,7 +624,7 @@
     </main>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="vendor/tesseract.min.js?v=16"></script>
-    <script src="app.js?v=16"></script>
+    <script src="vendor/tesseract.min.js?v=17"></script>
+    <script src="app.js?v=17"></script>
   </body>
 </html>

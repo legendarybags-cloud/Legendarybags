@@ -703,6 +703,22 @@ button:focus-visible {
   margin-top: 14px;
 }
 
+.monthly-promo {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbfd;
+  margin-top: 12px;
+  padding: 12px;
+}
+
+.monthly-promo label {
+  margin-top: 0;
+}
+
+.monthly-promo textarea {
+  background: #fff;
+}
+
 .generated-posts,
 .marketing-queue {
   display: grid;
