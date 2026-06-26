@@ -18,7 +18,8 @@ A local-first lead tracker for phone and internet sales follow-up.
 - Keeps lead cards compact by showing the main contact buttons first and putting extra actions, notes, and activity behind expanders.
 - Warns about possible duplicates by matching phone or email.
 - Adds a Facebook Marketing tab for Zirrus-aligned campaign drafts, local group/manual posting plans, a posting queue, response tracking, lead counters, and Meta Business Suite shortcuts.
-- Keeps data local unless you export it or host/sync it somewhere.
+- Saves data automatically in the browser, mirrors it to a second on-phone storage area, and shows last-saved/backup status on the Today screen.
+- Keeps data local unless you export it or add a secure sync backend later.
 
 ## How to use
 
@@ -51,7 +52,7 @@ This app does not auto-post into Facebook groups. For approved automation later,
 
 ## Backup and moving phones
 
-Use Settings to download a JSON backup, share it through your phone's share sheet, copy it, or export CSV. Save backups somewhere you control such as iCloud Drive, Google Drive, OneDrive, or email. True live sync between multiple phones needs a real backend/database and sign-in.
+The app saves automatically on the phone and keeps a second local browser backup mirror. Use Settings to download a JSON backup, share it through your phone's share sheet, copy it, or export CSV. Save backups somewhere you control such as iCloud Drive, Google Drive, OneDrive, or email. True live sync between multiple phones needs a real backend/database and sign-in.
 
 ## Compliance notes
 

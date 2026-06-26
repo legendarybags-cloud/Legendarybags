@@ -1,6 +1,10 @@
 (function () {
   const STORAGE_KEY = "lead-assistant-v2";
   const OLD_STORAGE_KEY = "lead-assistant-v1";
+  const DB_NAME = "lead-assistant-store";
+  const DB_VERSION = 1;
+  const DB_STORE = "state";
+  const DB_STATE_KEY = "current";
 
   const pricing = {
     bundleDiscount: 20,
@@ -208,11 +212,19 @@
     leads: [],
     marketing: clone(marketingDefaults),
     dailyReviewAt: "",
-    lastBackupAt: ""
+    lastBackupAt: "",
+    lastSavedAt: ""
   };
 
   let state = loadState();
   let deferredInstallPrompt = null;
+  let durableSaveTimer = null;
+  const durableStatus = {
+    supported: "indexedDB" in window,
+    persisted: false,
+    lastSavedAt: "",
+    error: ""
+  };
 
   const el = {
     leadEntryPanel: document.getElementById("leadEntryPanel"),
@@ -274,6 +286,7 @@
     dailyCloseout: document.getElementById("dailyCloseout"),
     productivityStats: document.getElementById("productivityStats"),
     statsGrid: document.getElementById("statsGrid"),
+    saveStatus: document.getElementById("saveStatus"),
     searchInput: document.getElementById("searchInput"),
     statusFilter: document.getElementById("statusFilter"),
     smsInitialTemplate: document.getElementById("smsInitialTemplate"),
@@ -309,6 +322,8 @@
     renderAll();
     wireEvents();
     setupInstallSupport();
+    requestPersistentStorage();
+    restoreDurableStateIfNeeded();
     setInterval(checkReminderAlerts, 60000);
   }
 
@@ -316,22 +331,47 @@
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem(OLD_STORAGE_KEY));
       if (!saved || typeof saved !== "object") return clone(defaults);
-      const settings = normalizeSettings({ ...defaults.settings, ...(saved.settings || {}) });
-      return {
-        ...clone(defaults),
-        ...saved,
-        settings,
-        templates: { ...defaults.templates, ...(saved.templates || {}) },
-        marketing: normalizeMarketing(saved.marketing),
-        leads: Array.isArray(saved.leads) ? saved.leads.map(normalizeLead) : []
-      };
+      return normalizeState(saved);
     } catch (error) {
       return clone(defaults);
     }
   }
 
   function saveState() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    state.lastSavedAt = new Date().toISOString();
+    const serialized = JSON.stringify(state);
+    try {
+      localStorage.setItem(STORAGE_KEY, serialized);
+      durableStatus.error = "";
+    } catch (error) {
+      durableStatus.error = "Browser storage is full. Export a backup now.";
+    }
+    scheduleDurableSave(serialized, state.lastSavedAt);
+    renderSaveStatus();
+  }
+
+  function normalizeState(source) {
+    const imported = source && typeof source === "object" ? source : {};
+    const leads = Array.isArray(imported.leads) ? imported.leads.map(normalizeLead) : [];
+    return {
+      ...clone(defaults),
+      ...imported,
+      settings: normalizeSettings({ ...defaults.settings, ...(imported.settings || {}) }),
+      templates: { ...defaults.templates, ...(imported.templates || {}) },
+      marketing: normalizeMarketing(imported.marketing),
+      leads,
+      lastBackupAt: imported.lastBackupAt || "",
+      lastSavedAt: imported.lastSavedAt || latestSavedAt(imported, leads)
+    };
+  }
+
+  function latestSavedAt(source, leads) {
+    const leadDates = leads.flatMap((lead) => [lead.updatedAt, lead.createdAt, lead.lastTouchAt]);
+    const latest = [source.lastBackupAt, source.dailyReviewAt, ...leadDates]
+      .map(dateValue)
+      .filter(Boolean)
+      .sort((a, b) => b - a)[0];
+    return latest ? new Date(latest).toISOString() : "";
   }
 
   function normalizeSettings(settings) {
@@ -342,6 +382,115 @@
     if (!String(normalized.replyEmail || "").trim()) normalized.replyEmail = contactDefaults.replyEmail;
     if (oldDefaultPhones.has(String(normalized.replyPhone || "").trim())) normalized.replyPhone = contactDefaults.replyPhone;
     return normalized;
+  }
+
+  async function requestPersistentStorage() {
+    if (!navigator.storage || !navigator.storage.persisted) {
+      renderSaveStatus();
+      return;
+    }
+    try {
+      durableStatus.persisted = await navigator.storage.persisted();
+      if (!durableStatus.persisted && navigator.storage.persist) {
+        durableStatus.persisted = await navigator.storage.persist();
+      }
+    } catch (error) {
+      durableStatus.persisted = false;
+    }
+    renderSaveStatus();
+  }
+
+  function scheduleDurableSave(serialized, savedAt) {
+    if (!durableStatus.supported) {
+      renderSaveStatus();
+      return;
+    }
+    clearTimeout(durableSaveTimer);
+    durableSaveTimer = window.setTimeout(() => {
+      saveDurableState(serialized, savedAt).catch(() => {
+        durableStatus.error = "Phone backup mirror failed. Export a backup.";
+        renderSaveStatus();
+      });
+    }, 200);
+  }
+
+  async function saveDurableState(serialized, savedAt) {
+    const db = await openDurableDb();
+    await putDurableRecord(db, {
+      id: DB_STATE_KEY,
+      savedAt,
+      payload: serialized
+    });
+    db.close();
+    durableStatus.lastSavedAt = savedAt;
+    durableStatus.error = "";
+    renderSaveStatus();
+  }
+
+  async function restoreDurableStateIfNeeded() {
+    if (!durableStatus.supported) {
+      renderSaveStatus();
+      return;
+    }
+    try {
+      const db = await openDurableDb();
+      const record = await getDurableRecord(db);
+      db.close();
+      if (!record || !record.payload) {
+        if (state.leads.length || state.lastSavedAt) scheduleDurableSave(JSON.stringify(state), state.lastSavedAt || new Date().toISOString());
+        renderSaveStatus();
+        return;
+      }
+      durableStatus.lastSavedAt = record.savedAt || "";
+      const durableState = normalizeState(JSON.parse(record.payload));
+      const durableTime = dateValue(durableState.lastSavedAt || record.savedAt);
+      const currentTime = dateValue(state.lastSavedAt);
+      const shouldRestore = durableTime > currentTime || (!state.leads.length && durableState.leads.length);
+      if (shouldRestore) {
+        state = durableState;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        fillEditors();
+        renderQuoteSummaries();
+        renderAll();
+        toast("Restored saved phone data.");
+      } else {
+        scheduleDurableSave(JSON.stringify(state), state.lastSavedAt || new Date().toISOString());
+      }
+      renderSaveStatus();
+    } catch (error) {
+      durableStatus.error = "Could not check phone backup mirror.";
+      renderSaveStatus();
+    }
+  }
+
+  function openDurableDb() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(DB_STORE)) {
+          db.createObjectStore(DB_STORE, { keyPath: "id" });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  function putDurableRecord(db, record) {
+    return new Promise((resolve, reject) => {
+      const request = db.transaction(DB_STORE, "readwrite").objectStore(DB_STORE).put(record);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  function getDurableRecord(db) {
+    return new Promise((resolve, reject) => {
+      const request = db.transaction(DB_STORE, "readonly").objectStore(DB_STORE).get(DB_STATE_KEY);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
   }
 
   function wireEvents() {
@@ -495,6 +644,7 @@
   }
 
   function renderAll() {
+    renderSaveStatus();
     renderStats();
     renderTodayQueue();
     renderDueLeads();
@@ -504,6 +654,36 @@
     renderProductivityStats();
     renderMarketing();
     renderLeads();
+  }
+
+  function renderSaveStatus() {
+    if (!el.saveStatus) return;
+    const localSaved = state.lastSavedAt ? formatDateTime(state.lastSavedAt) : "Not saved yet";
+    const phoneMirror = durableStatus.supported
+      ? durableStatus.lastSavedAt
+        ? `Phone backup ${formatDateTime(durableStatus.lastSavedAt)}`
+        : "Phone backup pending"
+      : "Phone backup unavailable";
+    const storageProtection = durableStatus.persisted ? "Protected storage on" : "Protected storage requested";
+    const backupAge = state.lastBackupAt ? Date.now() - dateValue(state.lastBackupAt) : Infinity;
+    const backupNeeded = backupAge > 7 * 24 * 60 * 60 * 1000;
+    const backupText = state.lastBackupAt ? `Exported ${formatDateTime(state.lastBackupAt)}` : "No export yet";
+    const warning = durableStatus.error || (backupNeeded ? "Share or download a backup before changing phones." : "Backups look current.");
+
+    el.saveStatus.innerHTML = `
+      <div>
+        <strong>Saved on this phone</strong>
+        <span>${escapeHtml(localSaved)}</span>
+      </div>
+      <div>
+        <strong>Extra phone copy</strong>
+        <span>${escapeHtml(`${phoneMirror} | ${storageProtection}`)}</span>
+      </div>
+      <div class="${backupNeeded || durableStatus.error ? "save-warning" : ""}">
+        <strong>External backup</strong>
+        <span>${escapeHtml(`${backupText}. ${warning}`)}</span>
+      </div>
+    `;
   }
 
   function renderQuoteSummaries() {
@@ -1942,13 +2122,7 @@
     reader.onload = () => {
       try {
         const imported = JSON.parse(String(reader.result));
-        state = {
-          ...clone(defaults),
-          ...imported,
-          settings: { ...defaults.settings, ...(imported.settings || {}) },
-          templates: { ...defaults.templates, ...(imported.templates || {}) },
-          leads: Array.isArray(imported.leads) ? imported.leads.map(normalizeLead) : []
-        };
+        state = normalizeState(imported);
         saveState();
         fillEditors();
         renderQuoteSummaries();

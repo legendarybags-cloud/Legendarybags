@@ -475,6 +475,7 @@ button:focus-visible {
 }
 
 #dashboardView .home-hero,
+#dashboardView .save-status,
 #dashboardView .stats-grid {
   grid-column: 1 / -1;
   margin-bottom: 0;
@@ -526,6 +527,46 @@ button:focus-visible {
 
 .home-actions button {
   min-height: 42px;
+}
+
+.save-status {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.save-status > div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 11px 12px;
+}
+
+.save-status strong,
+.save-status span {
+  display: block;
+}
+
+.save-status strong {
+  color: var(--ink);
+  font-size: 0.86rem;
+}
+
+.save-status span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-top: 4px;
+}
+
+.save-status .save-warning {
+  border-color: #f1d4a5;
+  background: #fff7e8;
+}
+
+.save-status .save-warning span {
+  color: #8a4d00;
 }
 
 .stats-grid {
@@ -1043,6 +1084,10 @@ button:focus-visible {
   .home-actions {
     grid-template-columns: 1fr 1fr;
     min-width: 0;
+  }
+
+  .save-status {
+    grid-template-columns: 1fr;
   }
 
   .tabs {
